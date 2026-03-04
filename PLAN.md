@@ -44,7 +44,7 @@ Build a multi-LLM consensus system from scratch. A user submits an enquiry, the 
 | **Live events** | DB polling every 1s (avoids PgBouncer/NOTIFY issues with managed Postgres) |
 | **SSE keepalive** | 15s comment pings (App Platform idle timeout) |
 | **SSE client** | `@microsoft/fetch-event-source` (supports Authorization header, unlike native EventSource) |
-| **Dark mode** | Day one (shadcn native support) |
+| **Dark mode** | Day one (Mantine native support) |
 | **Data fetching** | TanStack Query |
 | **Layout** | Desktop-first, responsive |
 
@@ -282,8 +282,8 @@ data: {"model": "mistral/mistral-large", "error": "timeout", "models_remaining":
 
 ## Frontend Stack
 
-- Next.js + Tailwind CSS + shadcn/ui
-- Dark mode from day one (shadcn theme toggle)
+- Next.js + Mantine
+- Dark mode from day one (Mantine color scheme toggle)
 - TanStack Query for data fetching
 - Desktop-first layout, responsive
 
@@ -313,7 +313,7 @@ Ordered for fastest time-to-visible-results. Each task is a shippable increment 
 - `.gitignore`
 - `Makefile` (up, down, logs, migrate, test, lint)
 - Backend: `pyproject.toml` with dependencies, `Dockerfile`, empty FastAPI app with `/health` endpoint
-- Frontend: `npx create-next-app`, Tailwind, `Dockerfile`
+- Frontend: `bunx create-next-app`, `Dockerfile`
 - **Tests**: health endpoint returns 200, frontend renders without crash
 - **Verify**: `make up` → all 3 services healthy
 
@@ -345,7 +345,7 @@ Ordered for fastest time-to-visible-results. Each task is a shippable increment 
 - **Verify**: curl magic-link → verify → get JWT → access protected endpoint
 
 **Task 2.3 — Auth frontend**
-- shadcn/ui setup + dark mode theme toggle
+- Mantine setup + dark mode color scheme toggle
 - Login page: email input → request magic link → "check your email" state
 - Verify page: reads token from URL params, calls verify endpoint, stores JWT
 - Protected layout wrapper (redirects to login if no token)
