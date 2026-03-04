@@ -6,8 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Container, Loader, Text, Stack, Button } from "@mantine/core";
 import { useAuth } from "../../../lib/auth-context";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 function VerifyContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -25,10 +23,9 @@ function VerifyContent() {
 
     async function verify() {
       try {
-        const resp = await fetch(`${API_URL}/api/auth/verify`, {
+        const resp = await fetch("/api/auth/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
           body: JSON.stringify({ email, token }),
         });
 

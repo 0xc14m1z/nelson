@@ -11,8 +11,6 @@ import {
   Stack,
 } from "@mantine/core";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
@@ -25,7 +23,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const resp = await fetch(`${API_URL}/api/auth/magic-link`, {
+      const resp = await fetch("/api/auth/magic-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

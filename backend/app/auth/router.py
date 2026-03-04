@@ -14,6 +14,7 @@ from app.auth.service import (
     RateLimitError,
     refresh_access_token,
     request_magic_link,
+    revoke_refresh_token,
     verify_magic_link,
 )
 from app.database import get_db
@@ -45,7 +46,7 @@ async def verify(body: VerifyRequest, response: Response, db: AsyncSession = Dep
         secure=False,  # False for local dev; set True in production via config
         samesite="lax",
         max_age=7 * 24 * 60 * 60,  # 7 days
-        path="/api/auth/refresh",
+        path="/api/auth",
     )
     return AuthResponse(access_token=tokens.access_token)
 
@@ -71,9 +72,21 @@ async def refresh(
         secure=False,
         samesite="lax",
         max_age=7 * 24 * 60 * 60,
-        path="/api/auth/refresh",
+        path="/api/auth",
     )
     return AuthResponse(access_token=tokens.access_token)
+
+
+@router.post("/logout")
+async def logout(
+    response: Response,
+    refresh_token: str | None = Cookie(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    if refresh_token:
+        await revoke_refresh_token(refresh_token, db)
+    response.delete_cookie(key="refresh_token", path="/api/auth")
+    return {"message": "Logged out."}
 
 
 @router.get("/me", response_model=UserResponse)

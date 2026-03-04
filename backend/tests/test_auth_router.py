@@ -8,6 +8,7 @@ from app.config import settings
 from app.database import engine
 from app.main import app
 from app.models import MagicLink, User
+from tests.conftest import extract_token_from_mailpit
 
 
 @pytest.fixture
@@ -26,7 +27,7 @@ async def clean_mailpit():
 @pytest.fixture(autouse=True)
 async def clean_test_data(db_session):
     yield
-    for email in ["router-test@example.com", "rate-router@example.com"]:
+    for email in ["router-test@example.com", "rate-router@example.com", "logout-test@example.com"]:
         result = await db_session.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
         if user:
@@ -68,10 +69,8 @@ async def test_magic_link_rate_limit(client):
 
 @pytest.mark.asyncio
 async def test_verify_endpoint(client):
-    from app.auth.service import _extract_token_from_mailpit
-
     await client.post("/api/auth/magic-link", json={"email": "router-test@example.com"})
-    raw_token = await _extract_token_from_mailpit("router-test@example.com")
+    raw_token = await extract_token_from_mailpit("router-test@example.com")
 
     resp = await client.post(
         "/api/auth/verify", json={"email": "router-test@example.com", "token": raw_token}
@@ -93,10 +92,8 @@ async def test_verify_invalid_token(client):
 
 @pytest.mark.asyncio
 async def test_refresh_endpoint(client):
-    from app.auth.service import _extract_token_from_mailpit
-
     await client.post("/api/auth/magic-link", json={"email": "router-test@example.com"})
-    raw_token = await _extract_token_from_mailpit("router-test@example.com")
+    raw_token = await extract_token_from_mailpit("router-test@example.com")
 
     verify_resp = await client.post(
         "/api/auth/verify", json={"email": "router-test@example.com", "token": raw_token}
@@ -118,10 +115,8 @@ async def test_refresh_without_cookie(client):
 
 @pytest.mark.asyncio
 async def test_protected_endpoint_with_token(client):
-    from app.auth.service import _extract_token_from_mailpit
-
     await client.post("/api/auth/magic-link", json={"email": "router-test@example.com"})
-    raw_token = await _extract_token_from_mailpit("router-test@example.com")
+    raw_token = await extract_token_from_mailpit("router-test@example.com")
 
     verify_resp = await client.post(
         "/api/auth/verify", json={"email": "router-test@example.com", "token": raw_token}
@@ -137,3 +132,31 @@ async def test_protected_endpoint_with_token(client):
 async def test_protected_endpoint_without_token(client):
     resp = await client.get("/api/auth/me")
     assert resp.status_code in (401, 403)  # HTTPBearer returns 401 or 403 for missing token
+
+
+@pytest.mark.asyncio
+async def test_logout_revokes_token_and_clears_cookie(client):
+    """Logout should revoke the refresh token and clear the cookie."""
+    email = "logout-test@example.com"
+
+    # Login flow
+    await client.post("/api/auth/magic-link", json={"email": email})
+    raw_token = await extract_token_from_mailpit(email)
+    verify_resp = await client.post("/api/auth/verify", json={"email": email, "token": raw_token})
+    assert verify_resp.status_code == 200
+    cookies = verify_resp.cookies
+
+    # Logout
+    logout_resp = await client.post("/api/auth/logout", cookies=cookies)
+    assert logout_resp.status_code == 200
+
+    # Refresh with the old cookie should fail
+    refresh_resp = await client.post("/api/auth/refresh", cookies=cookies)
+    assert refresh_resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_without_cookie(client):
+    """Logout without a cookie should still succeed (no-op)."""
+    resp = await client.post("/api/auth/logout")
+    assert resp.status_code == 200

@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import secrets
 import smtplib
@@ -65,11 +66,11 @@ def _send_email_resend(to: str, subject: str, body: str) -> None:
     )
 
 
-def _send_email(to: str, subject: str, body: str) -> None:
+async def _send_email(to: str, subject: str, body: str) -> None:
     if settings.email_provider == "resend":
-        _send_email_resend(to, subject, body)
+        await asyncio.to_thread(_send_email_resend, to, subject, body)
     else:
-        _send_email_smtp(to, subject, body)
+        await asyncio.to_thread(_send_email_smtp, to, subject, body)
 
 
 async def request_magic_link(email: str, db: AsyncSession) -> None:
@@ -96,7 +97,7 @@ async def request_magic_link(email: str, db: AsyncSession) -> None:
     await db.commit()
 
     url = f"{settings.magic_link_base_url}?token={raw_token}&email={email}"
-    _send_email(
+    await _send_email(
         to=email,
         subject="Your Nelson login link",
         body=f"Click here to log in: {url}\n\nThis link expires in 15 minutes.",
@@ -185,25 +186,17 @@ async def refresh_access_token(raw_refresh_token: str, db: AsyncSession) -> Auth
     return AuthTokens(access_token=access_token, refresh_token=new_raw_refresh)
 
 
-async def _extract_token_from_mailpit(email: str) -> str:
-    """Test helper: extract the raw token from the last Mailpit email to this address."""
-    import re
+async def revoke_refresh_token(raw_token: str, db: AsyncSession) -> None:
+    token_hash = _hash_token(raw_token)
+    now = datetime.now(UTC)
 
-    import httpx
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(f"http://{settings.smtp_host}:8025/api/v1/messages")
-        messages = resp.json()["messages"]
-
-        for msg in messages:
-            if any(email in r["Address"] for r in msg["To"]):
-                # Fetch full message body
-                detail = await client.get(
-                    f"http://{settings.smtp_host}:8025/api/v1/message/{msg['ID']}"
-                )
-                body = detail.json()["Text"]
-                match = re.search(r"token=([^&\s]+)", body)
-                if match:
-                    return match.group(1)
-
-    raise ValueError(f"No magic link email found for {email}")
+    result = await db.execute(
+        select(RefreshToken).where(
+            RefreshToken.token_hash == token_hash,
+            RefreshToken.revoked_at.is_(None),
+        )
+    )
+    token = result.scalar_one_or_none()
+    if token is not None:
+        token.revoked_at = now
+        await db.commit()

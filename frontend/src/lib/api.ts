@@ -1,5 +1,3 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 let accessToken: string | null = null;
 let refreshPromise: Promise<string | null> | null = null;
 
@@ -13,9 +11,8 @@ export function getAccessToken(): string | null {
 
 async function refreshAccessToken(): Promise<string | null> {
   try {
-    const resp = await fetch(`${API_URL}/api/auth/refresh`, {
+    const resp = await fetch("/api/auth/refresh", {
       method: "POST",
-      credentials: "include", // sends httpOnly cookie
     });
     if (!resp.ok) return null;
     const data = await resp.json();
@@ -35,10 +32,9 @@ export async function apiFetch(
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
-  let resp = await fetch(`${API_URL}${path}`, {
+  let resp = await fetch(path, {
     ...options,
     headers,
-    credentials: "include",
   });
 
   if (resp.status === 401 && accessToken) {
@@ -51,10 +47,9 @@ export async function apiFetch(
     const newToken = await refreshPromise;
     if (newToken) {
       headers.set("Authorization", `Bearer ${newToken}`);
-      resp = await fetch(`${API_URL}${path}`, {
+      resp = await fetch(path, {
         ...options,
         headers,
-        credentials: "include",
       });
     }
   }

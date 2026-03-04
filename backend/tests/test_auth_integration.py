@@ -4,11 +4,11 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.service import _extract_token_from_mailpit
 from app.config import settings
 from app.database import engine
 from app.main import app
 from app.models import MagicLink, User
+from tests.conftest import extract_token_from_mailpit
 
 
 @pytest.fixture
@@ -56,7 +56,7 @@ async def test_full_auth_flow(client):
     assert resp.status_code == 200
 
     # 2. Extract token from Mailpit
-    raw_token = await _extract_token_from_mailpit(email)
+    raw_token = await extract_token_from_mailpit(email)
     assert raw_token is not None
 
     # 3. Verify magic link
@@ -100,7 +100,7 @@ async def test_reused_magic_link_rejected(client):
     resp = await client.post("/api/auth/magic-link", json={"email": email})
     assert resp.status_code == 200
 
-    raw_token = await _extract_token_from_mailpit(email)
+    raw_token = await extract_token_from_mailpit(email)
 
     # First use succeeds
     resp = await client.post("/api/auth/verify", json={"email": email, "token": raw_token})

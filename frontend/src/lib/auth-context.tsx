@@ -22,7 +22,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (accessToken: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -53,7 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [fetchUser]
   );
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Best-effort: clear local state even if server call fails
+    }
     setAccessToken(null);
     setUser(null);
   }, []);
@@ -61,12 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Silent refresh on mount
   useEffect(() => {
     async function tryRestore() {
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       try {
-        const resp = await fetch(`${API_URL}/api/auth/refresh`, {
+        const resp = await fetch("/api/auth/refresh", {
           method: "POST",
-          credentials: "include",
         });
         if (resp.ok) {
           const data = await resp.json();

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import engine
 from app.models import MagicLink, User
+from tests.conftest import extract_token_from_mailpit
 
 
 @pytest.fixture
@@ -97,10 +98,10 @@ async def test_request_magic_link_rate_limit(db_session):
 
 @pytest.mark.asyncio
 async def test_verify_creates_user_on_first_login(db_session):
-    from app.auth.service import _extract_token_from_mailpit, request_magic_link, verify_magic_link
+    from app.auth.service import request_magic_link, verify_magic_link
 
     await request_magic_link("verify-test@example.com", db_session)
-    raw_token = await _extract_token_from_mailpit("verify-test@example.com")
+    raw_token = await extract_token_from_mailpit("verify-test@example.com")
 
     result = await verify_magic_link("verify-test@example.com", raw_token, db_session)
 
@@ -117,10 +118,10 @@ async def test_verify_creates_user_on_first_login(db_session):
 
 @pytest.mark.asyncio
 async def test_verify_marks_link_used(db_session):
-    from app.auth.service import _extract_token_from_mailpit, request_magic_link, verify_magic_link
+    from app.auth.service import request_magic_link, verify_magic_link
 
     await request_magic_link("verify-test@example.com", db_session)
-    raw_token = await _extract_token_from_mailpit("verify-test@example.com")
+    raw_token = await extract_token_from_mailpit("verify-test@example.com")
 
     await verify_magic_link("verify-test@example.com", raw_token, db_session)
 
@@ -133,15 +134,10 @@ async def test_verify_marks_link_used(db_session):
 
 @pytest.mark.asyncio
 async def test_verify_rejects_used_token(db_session):
-    from app.auth.service import (
-        InvalidTokenError,
-        _extract_token_from_mailpit,
-        request_magic_link,
-        verify_magic_link,
-    )
+    from app.auth.service import InvalidTokenError, request_magic_link, verify_magic_link
 
     await request_magic_link("verify-test@example.com", db_session)
-    raw_token = await _extract_token_from_mailpit("verify-test@example.com")
+    raw_token = await extract_token_from_mailpit("verify-test@example.com")
 
     await verify_magic_link("verify-test@example.com", raw_token, db_session)
     with pytest.raises(InvalidTokenError):
@@ -171,15 +167,10 @@ async def test_verify_rejects_expired_token(db_session):
 
 @pytest.mark.asyncio
 async def test_refresh_returns_new_tokens(db_session):
-    from app.auth.service import (
-        _extract_token_from_mailpit,
-        refresh_access_token,
-        request_magic_link,
-        verify_magic_link,
-    )
+    from app.auth.service import refresh_access_token, request_magic_link, verify_magic_link
 
     await request_magic_link("refresh-test@example.com", db_session)
-    raw_token = await _extract_token_from_mailpit("refresh-test@example.com")
+    raw_token = await extract_token_from_mailpit("refresh-test@example.com")
     auth = await verify_magic_link("refresh-test@example.com", raw_token, db_session)
 
     new_auth = await refresh_access_token(auth.refresh_token, db_session)
@@ -194,14 +185,13 @@ async def test_refresh_returns_new_tokens(db_session):
 async def test_refresh_revokes_old_token(db_session):
     from app.auth.service import (
         InvalidTokenError,
-        _extract_token_from_mailpit,
         refresh_access_token,
         request_magic_link,
         verify_magic_link,
     )
 
     await request_magic_link("refresh-test@example.com", db_session)
-    raw_token = await _extract_token_from_mailpit("refresh-test@example.com")
+    raw_token = await extract_token_from_mailpit("refresh-test@example.com")
     auth = await verify_magic_link("refresh-test@example.com", raw_token, db_session)
     old_refresh = auth.refresh_token
 
