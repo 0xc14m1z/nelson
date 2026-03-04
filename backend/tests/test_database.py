@@ -1,8 +1,8 @@
 import pytest
-from sqlalchemy import select, func, inspect
+from sqlalchemy import func, inspect, select
 
 from app.database import engine
-from app.models import Base, Provider, LLMModel
+from app.models import LLMModel, Provider
 
 
 @pytest.fixture

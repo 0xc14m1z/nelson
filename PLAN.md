@@ -5,7 +5,7 @@
 | Milestone | Status | PR |
 |-----------|--------|----|
 | 1 — Running skeleton | DONE | [#1](https://github.com/0xc14m1z/nelson/pull/1) (merged) |
-| 2 — Auth works | TODO | |
+| 2 — Auth works | DONE | |
 | 2.5 — Deployed on App Platform | TODO | |
 | 3 — API keys + model config | TODO | |
 | 4 — Core consensus | TODO | |
@@ -350,32 +350,13 @@ Ordered for fastest time-to-visible-results. Each task is a shippable increment 
 
 See "What's built" section above for details.
 
-### Milestone 2 — Auth works (can log in via magic link)
+### Milestone 2 — Auth works (can log in via magic link) ✅ DONE
 
-**Task 2.1 — User + auth DB models**
-- ORM models: `users`, `user_settings`, `magic_links`, `refresh_tokens`
-- Migration
-- **Tests**: models create/read/cascade correctly
+**Task 2.1 — User + auth DB models** ✅
+**Task 2.2 — Auth backend** ✅
+**Task 2.3 — Auth frontend** ✅
 
-**Task 2.2 — Auth backend**
-- `auth/service.py`: magic link generation, token hashing, JWT creation (access + refresh), email sending (SMTP locally via Mailpit, Resend in production)
-- `auth/router.py`: `POST /api/auth/magic-link`, `POST /api/auth/verify`, `POST /api/auth/refresh`
-- `auth/dependencies.py`: `get_current_user` dependency
-- `auth/schemas.py`: request/response models
-- Rate limiting: 3 magic links per email per 15min (DB check)
-- Auto-create user on first verify (if email not in users table)
-- **Tests**: full auth flow with Mailpit (real SMTP in Docker), expired token rejection, rate limit enforcement, refresh flow, invalid token handling
-- **Verify**: curl magic-link → verify → get JWT → access protected endpoint
-
-**Task 2.3 — Auth frontend**
-- Mantine setup + dark mode color scheme toggle
-- Login page: email input → request magic link → "check your email" state
-- Verify page: reads token from URL params, calls verify endpoint, stores JWT
-- Protected layout wrapper (redirects to login if no token)
-- JWT refresh on 401
-- Dashboard page (empty shell, just proves auth works)
-- **Tests**: login form renders and submits, verify page handles success/error, protected redirect works
-- **Verify**: full browser flow — enter email → click link → land on dashboard
+36 backend tests + 3 frontend tests passing. Design doc: `docs/plans/2026-03-04-milestone-2-auth-design.md`
 
 ### Milestone 2.5 — Deployed on App Platform (deploy early, deploy often)
 

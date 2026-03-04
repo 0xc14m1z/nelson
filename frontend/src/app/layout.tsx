@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ColorSchemeScript, MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { theme } from "../theme";
+import { AuthProvider } from "../lib/auth-context";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,7 +23,7 @@ export default function RootLayout({
       <body>
         <MantineProvider theme={theme} defaultColorScheme="auto">
           <Notifications />
-          {children}
+          <AuthProvider>{children}</AuthProvider>
         </MantineProvider>
       </body>
     </html>

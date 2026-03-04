@@ -12,4 +12,4 @@ class Provider(UUIDPrimaryKey, TimestampMixin, Base):
     base_url: Mapped[str] = mapped_column(String(500), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    models: Mapped[list["LLMModel"]] = relationship(back_populates="provider")  # noqa: F821
+    models: Mapped[list["LLMModel"]] = relationship(back_populates="provider")  # noqa: F821, UP037
