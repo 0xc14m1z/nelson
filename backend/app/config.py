@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     fernet_key: str = "change-me-in-production"
     resend_api_key: str = ""
+    smtp_host: str = "localhost"
+    smtp_port: int = 1025
+    email_from: str = "nelson@localhost"
+    email_provider: str = "smtp"  # "smtp" for local (Mailpit), "resend" for production
     cors_origins: list[str] = ["http://localhost:3000"]
     magic_link_base_url: str = "http://localhost:3000/login/verify"
 

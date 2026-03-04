@@ -21,7 +21,7 @@ Build a multi-LLM consensus system from scratch. A user submits an enquiry, the 
 | **Cost storage** | DECIMAL (sub-cent, stored as dollars e.g. 0.0042) |
 | **Session delete** | Hard delete with CASCADE |
 | **JWT expiry** | 15min access token + 7d refresh token |
-| **Email provider** | Resend |
+| **Email provider** | Mailpit (local dev/test via SMTP), Resend (production only) |
 | **Rate limiting** | 3 magic link requests per email per 15min (DB check) |
 | **Key validation** | Validate on save by calling provider API |
 | **Encryption** | Single FERNET_KEY in .env (managed via App Platform env vars) |
@@ -68,7 +68,7 @@ nelson/
 │       ├── database.py          # SQLAlchemy async engine + session
 │       ├── auth/
 │       │   ├── router.py        # /auth/magic-link, /auth/verify, /auth/refresh
-│       │   ├── service.py       # Token gen, verification, Resend email
+│       │   ├── service.py       # Token gen, verification, email (SMTP/Resend)
 │       │   ├── dependencies.py  # get_current_user
 │       │   └── schemas.py
 │       ├── users/
@@ -341,7 +341,7 @@ Ordered for fastest time-to-visible-results. Each task is a shippable increment 
 - **Tests**: models create/read/cascade correctly
 
 **Task 2.2 — Auth backend**
-- `auth/service.py`: magic link generation, token hashing, JWT creation (access + refresh), Resend email integration
+- `auth/service.py`: magic link generation, token hashing, JWT creation (access + refresh), email sending (SMTP locally via Mailpit, Resend in production)
 - `auth/router.py`: `POST /api/auth/magic-link`, `POST /api/auth/verify`, `POST /api/auth/refresh`
 - `auth/dependencies.py`: `get_current_user` dependency
 - `auth/schemas.py`: request/response models

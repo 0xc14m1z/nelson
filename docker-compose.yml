@@ -24,6 +24,9 @@ services:
       JWT_SECRET: local-dev-secret
       FERNET_KEY: local-dev-fernet-key
       CORS_ORIGINS: '["http://localhost:3000"]'
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      EMAIL_PROVIDER: smtp
     depends_on:
       db:
         condition: service_healthy
@@ -32,6 +35,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8025/api/v1/info"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   frontend:
     build: ./frontend

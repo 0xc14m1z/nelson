@@ -10,7 +10,8 @@ RUN uv sync --frozen --no-dev --no-install-project 2>/dev/null || uv sync --no-d
 COPY . .
 RUN uv sync --frozen --no-dev 2>/dev/null || uv sync --no-dev
 
-RUN groupadd --system --gid 1001 app && useradd --system --uid 1001 --gid app app
+RUN groupadd --system --gid 1001 app && useradd --system --uid 1001 --gid app --home /home/app --create-home app
+RUN chown -R app:app /app
 USER app
 
 EXPOSE 8000
