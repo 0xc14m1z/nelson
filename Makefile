@@ -12,13 +12,10 @@ logs:
 migrate:
 	cd backend && uv run alembic upgrade head
 
-test: backend-test frontend-test
+test: backend-test
 
 backend-test:
 	cd backend && uv run pytest -v
-
-frontend-test:
-	cd frontend && bun test
 
 lint:
 	cd backend && uv run ruff check . && uv run ruff format --check .

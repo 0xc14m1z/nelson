@@ -12,7 +12,7 @@ class LLMModel(UUIDPrimaryKey, TimestampMixin, Base):
     __table_args__ = (UniqueConstraint("provider_id", "slug", name="uq_provider_slug"),)
 
     provider_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("providers.id"), nullable=False
+        ForeignKey("providers.id"), nullable=False, index=True
     )
     slug: Mapped[str] = mapped_column(String(100), nullable=False)
     display_name: Mapped[str] = mapped_column(String(200), nullable=False)

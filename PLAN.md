@@ -291,10 +291,16 @@ data: {"model": "mistral/mistral-large", "error": "timeout", "models_remaining":
 
 ## Testing Philosophy
 
-**Every task ships with tests. No exceptions.**
+**Every task ships with tests. No exceptions. Prefer real infrastructure over mocks.**
+
+We accept slower tests in exchange for realistic coverage. Mocks hide bugs.
 
 - Backend: `pytest` + `pytest-asyncio` + `httpx` (async test client). Every endpoint, service, and agent tested.
-- PydanticAI agents: tested with `TestModel` — no real API calls in CI.
+- **Database**: Tests run against real Postgres (via Docker). No SQLite substitutes, no in-memory fakes.
+- **Email (auth)**: Use Mailpit (local SMTP server in Docker Compose) instead of mocking Resend. Tests send real emails and verify delivery via Mailpit's API.
+- **API key validation**: Hit real provider validation endpoints where feasible. Only stub when the provider has no free validation path.
+- **PydanticAI agents**: Use `TestModel` for LLM calls only — these cost real money and are non-deterministic. This is the one acceptable fake.
+- **Observability**: Use Logfire's testing exporter (not a mock — it's the official test harness).
 - Frontend: Vitest + React Testing Library for components, Playwright for critical E2E flows.
 - CI runs all tests on every PR. Red CI = no merge.
 - Test files live next to source: `test_router.py` beside `router.py`, `ModelSelector.test.tsx` beside `ModelSelector.tsx`.
@@ -341,7 +347,7 @@ Ordered for fastest time-to-visible-results. Each task is a shippable increment 
 - `auth/schemas.py`: request/response models
 - Rate limiting: 3 magic links per email per 15min (DB check)
 - Auto-create user on first verify (if email not in users table)
-- **Tests**: full auth flow with mocked Resend, expired token rejection, rate limit enforcement, refresh flow, invalid token handling
+- **Tests**: full auth flow with Mailpit (real SMTP in Docker), expired token rejection, rate limit enforcement, refresh flow, invalid token handling
 - **Verify**: curl magic-link → verify → get JWT → access protected endpoint
 
 **Task 2.3 — Auth frontend**
@@ -380,7 +386,7 @@ Ordered for fastest time-to-visible-results. Each task is a shippable increment 
 - `keys/service.py`: store (encrypt + validate by calling provider API), list (masked), delete
 - `keys/router.py`: `GET/POST/DELETE /api/keys`, `POST /api/keys/{provider_id}/validate`
 - `keys/schemas.py`
-- **Tests**: encrypt/decrypt roundtrip, store + retrieve masked, validation with mocked provider API, duplicate key per provider rejected
+- **Tests**: encrypt/decrypt roundtrip, store + retrieve masked, validation against real provider endpoints where possible, duplicate key per provider rejected
 
 **Task 3.2 — Providers, models, and user settings endpoints**
 - `GET /api/providers` (from DB)
@@ -470,7 +476,7 @@ Ordered for fastest time-to-visible-results. Each task is a shippable increment 
 - Logfire: `logfire.configure()` + `logfire.instrument_fastapi(app)`
 - Manual spans: per-round, per-model-call, per-orchestrator-run
 - Structured logging throughout
-- **Tests**: verify spans are created (mock Logfire exporter)
+- **Tests**: verify spans are created (Logfire testing exporter)
 
 **Task 6.2 — Usage tracking**
 - `GET /api/billing/usage`: aggregate costs by period, by model, by session
