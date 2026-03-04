@@ -2,10 +2,16 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user
-from app.auth.schemas import AuthResponse, MagicLinkRequest, MagicLinkResponse, UserResponse, VerifyRequest
+from app.auth.schemas import (
+    AuthResponse,
+    MagicLinkRequest,
+    MagicLinkResponse,
+    UserResponse,
+    VerifyRequest,
+)
 from app.auth.service import (
-    InvalidToken,
-    RateLimitExceeded,
+    InvalidTokenError,
+    RateLimitError,
     refresh_access_token,
     request_magic_link,
     verify_magic_link,
@@ -20,7 +26,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 async def send_magic_link(body: MagicLinkRequest, db: AsyncSession = Depends(get_db)):
     try:
         await request_magic_link(body.email, db)
-    except RateLimitExceeded:
+    except RateLimitError:
         raise HTTPException(status_code=429, detail="Too many requests. Try again later.")
     return MagicLinkResponse(message="Check your email for a login link.")
 
@@ -29,7 +35,7 @@ async def send_magic_link(body: MagicLinkRequest, db: AsyncSession = Depends(get
 async def verify(body: VerifyRequest, response: Response, db: AsyncSession = Depends(get_db)):
     try:
         tokens = await verify_magic_link(body.email, body.token, db)
-    except InvalidToken:
+    except InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid or expired magic link.")
 
     response.set_cookie(
@@ -55,7 +61,7 @@ async def refresh(
 
     try:
         tokens = await refresh_access_token(refresh_token, db)
-    except InvalidToken:
+    except InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token.")
 
     response.set_cookie(

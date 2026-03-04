@@ -25,4 +25,4 @@ class LLMModel(UUIDPrimaryKey, TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     context_window: Mapped[int] = mapped_column(Integer, nullable=False, default=128000)
 
-    provider: Mapped["Provider"] = relationship(back_populates="models")  # noqa: F821
+    provider: Mapped["Provider"] = relationship(back_populates="models")  # noqa: F821, UP037

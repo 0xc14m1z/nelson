@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
@@ -35,7 +35,7 @@ async def test_decode_valid_token(test_user, db_session):
         {
             "sub": str(test_user.id),
             "email": test_user.email,
-            "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
+            "exp": datetime.now(UTC) + timedelta(minutes=15),
         },
         settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
@@ -52,7 +52,7 @@ async def test_decode_expired_token():
         {
             "sub": "fake-id",
             "email": "x@x.com",
-            "exp": datetime.now(timezone.utc) - timedelta(minutes=1),
+            "exp": datetime.now(UTC) - timedelta(minutes=1),
         },
         settings.jwt_secret,
         algorithm=settings.jwt_algorithm,

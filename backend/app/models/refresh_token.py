@@ -17,4 +17,4 @@ class RefreshToken(UUIDPrimaryKey, TimestampMixin, Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    user: Mapped["User"] = relationship(back_populates="refresh_tokens")  # noqa: F821
+    user: Mapped["User"] = relationship(back_populates="refresh_tokens")  # noqa: F821, UP037

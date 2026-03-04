@@ -13,10 +13,10 @@ class User(UUIDPrimaryKey, TimestampMixin, UpdatedAtMixin, Base):
     display_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     billing_mode: Mapped[str] = mapped_column(String(50), nullable=False, default="own_keys")
 
-    settings: Mapped["UserSettings"] = relationship(
+    settings: Mapped["UserSettings"] = relationship(  # noqa: UP037
         back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
-    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(  # noqa: F821
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(  # noqa: F821, UP037
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -29,4 +29,4 @@ class UserSettings(UUIDPrimaryKey, TimestampMixin, UpdatedAtMixin, Base):
     )
     max_rounds: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    user: Mapped["User"] = relationship(back_populates="settings")
+    user: Mapped["User"] = relationship(back_populates="settings")  # noqa: UP037

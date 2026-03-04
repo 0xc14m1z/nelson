@@ -2,7 +2,7 @@ import hashlib
 import secrets
 import smtplib
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 
 import jwt
@@ -13,11 +13,11 @@ from app.config import settings
 from app.models import MagicLink, RefreshToken, User, UserSettings
 
 
-class RateLimitExceeded(Exception):
+class RateLimitError(Exception):
     pass
 
 
-class InvalidToken(Exception):
+class InvalidTokenError(Exception):
     pass
 
 
@@ -35,8 +35,8 @@ def _create_access_token(user_id: str, email: str) -> str:
     payload = {
         "sub": user_id,
         "email": email,
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes),
-        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes),
+        "iat": datetime.now(UTC),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
@@ -74,7 +74,7 @@ def _send_email(to: str, subject: str, body: str) -> None:
 
 async def request_magic_link(email: str, db: AsyncSession) -> None:
     # Rate limit: 3 per email per 15 minutes
-    since = datetime.now(timezone.utc) - timedelta(minutes=15)
+    since = datetime.now(UTC) - timedelta(minutes=15)
     result = await db.execute(
         select(func.count())
         .select_from(MagicLink)
@@ -82,7 +82,7 @@ async def request_magic_link(email: str, db: AsyncSession) -> None:
     )
     count = result.scalar()
     if count >= 3:
-        raise RateLimitExceeded("Too many magic link requests. Try again later.")
+        raise RateLimitError("Too many magic link requests. Try again later.")
 
     raw_token = secrets.token_urlsafe(32)
     token_hash = _hash_token(raw_token)
@@ -90,7 +90,7 @@ async def request_magic_link(email: str, db: AsyncSession) -> None:
     link = MagicLink(
         email=email,
         token_hash=token_hash,
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+        expires_at=datetime.now(UTC) + timedelta(minutes=15),
     )
     db.add(link)
     await db.commit()
@@ -105,7 +105,7 @@ async def request_magic_link(email: str, db: AsyncSession) -> None:
 
 async def verify_magic_link(email: str, token: str, db: AsyncSession) -> AuthTokens:
     token_hash = _hash_token(token)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     result = await db.execute(
         select(MagicLink).where(
@@ -117,7 +117,7 @@ async def verify_magic_link(email: str, token: str, db: AsyncSession) -> AuthTok
     )
     link = result.scalar_one_or_none()
     if link is None:
-        raise InvalidToken("Invalid or expired magic link.")
+        raise InvalidTokenError("Invalid or expired magic link.")
 
     link.used_at = now
     await db.flush()
@@ -149,7 +149,7 @@ async def verify_magic_link(email: str, token: str, db: AsyncSession) -> AuthTok
 
 async def refresh_access_token(raw_refresh_token: str, db: AsyncSession) -> AuthTokens:
     token_hash = _hash_token(raw_refresh_token)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     result = await db.execute(
         select(RefreshToken).where(
@@ -160,7 +160,7 @@ async def refresh_access_token(raw_refresh_token: str, db: AsyncSession) -> Auth
     )
     token = result.scalar_one_or_none()
     if token is None:
-        raise InvalidToken("Invalid or expired refresh token.")
+        raise InvalidTokenError("Invalid or expired refresh token.")
 
     # Revoke old token
     token.revoked_at = now

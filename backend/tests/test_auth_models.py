@@ -1,6 +1,6 @@
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
+import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -79,11 +79,11 @@ async def test_user_email_unique(db_session):
 async def test_cascade_delete_user(db_session):
     user = User(email="cascade-test@example.com")
     settings = UserSettings(user=user)  # noqa: F841
-    refresh = RefreshToken(
+    RefreshToken(
         user=user,
         token_hash="a" * 64,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
-    )  # noqa: F841
+        expires_at=datetime.now(UTC) + timedelta(days=7),
+    )
     db_session.add(user)
     await db_session.commit()
     await db_session.refresh(user)
@@ -104,7 +104,7 @@ async def test_create_magic_link(db_session):
     link = MagicLink(
         email="magic@example.com",
         token_hash="b" * 64,
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+        expires_at=datetime.now(UTC) + timedelta(minutes=15),
     )
     db_session.add(link)
     await db_session.commit()
@@ -123,7 +123,7 @@ async def test_create_refresh_token(test_user, db_session):
     token = RefreshToken(
         user=test_user,
         token_hash="c" * 64,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        expires_at=datetime.now(UTC) + timedelta(days=7),
     )
     db_session.add(token)
     await db_session.commit()
