@@ -1,5 +1,37 @@
 # Nelson — Consensus Agent Implementation Plan
 
+## Progress
+
+| Milestone | Status | PR |
+|-----------|--------|----|
+| 1 — Running skeleton | DONE | [#1](https://github.com/0xc14m1z/nelson/pull/1) (merged) |
+| 2 — Auth works | TODO | |
+| 2.5 — Deployed on App Platform | TODO | |
+| 3 — API keys + model config | TODO | |
+| 4 — Core consensus | TODO | |
+| 5 — Live streaming UI | TODO | |
+| 6 — Production-ready | TODO | |
+| 7 — Pay-per-use | TODO | |
+
+### What's built (Milestone 1)
+
+- **Docker Compose**: Postgres 16, FastAPI backend, Next.js frontend, Mailpit (email)
+- **Backend**: Python 3.14, uv, FastAPI with `/health`, Pydantic Settings, SQLAlchemy async
+- **Frontend**: Next.js + Mantine UI + bun, dark mode support
+- **Database**: Alembic migrations, `providers` and `llm_models` tables with seed data (5 providers, 11 models)
+- **Tooling**: Makefile (`make up/down/logs/migrate/test/lint`), `.dockerignore` files, non-root containers
+- **Tests**: 7 passing (1 health endpoint + 6 DB/seed verification), all against real Postgres
+- **Repo**: https://github.com/0xc14m1z/nelson — `main` branch
+
+### Dev preferences (carry forward)
+
+- **Python**: 3.14, managed with `uv`
+- **Frontend**: `bun`, Mantine (no Tailwind)
+- **Email**: Mailpit locally (SMTP), Resend in production only
+- **Testing**: Real infra, no mocks (except `TestModel` for LLM calls)
+
+---
+
 ## Context
 
 Build a multi-LLM consensus system from scratch. A user submits an enquiry, the system fans it out to multiple LLMs, collects responses, then iterates critique rounds until the models converge on a consensus. The user picks their preferred final answer from all revised responses.
@@ -311,27 +343,12 @@ We accept slower tests in exchange for realistic coverage. Mocks hide bugs.
 
 Ordered for fastest time-to-visible-results. Each task is a shippable increment with tests.
 
-### Milestone 1 — Running skeleton (`docker compose up` works)
+### Milestone 1 — Running skeleton (`docker compose up` works) ✅ DONE
 
-**Task 1.1 — Project scaffolding**
-- `docker-compose.yml` (Postgres 16 + backend + frontend)
-- `.env.example` with all required vars
-- `.gitignore`
-- `Makefile` (up, down, logs, migrate, test, lint)
-- Backend: `pyproject.toml` with dependencies, `Dockerfile`, empty FastAPI app with `/health` endpoint
-- Frontend: `bunx create-next-app`, `Dockerfile`
-- **Tests**: health endpoint returns 200, frontend renders without crash
-- **Verify**: `make up` → all 3 services healthy
+**Task 1.1 — Project scaffolding** ✅
+**Task 1.2 — Database foundation** ✅
 
-**Task 1.2 — Database foundation**
-- `app/config.py` (Pydantic Settings)
-- `app/database.py` (SQLAlchemy async engine + session factory)
-- Alembic init + config pointing to async engine
-- ORM models: `providers`, `llm_models` (just these two first)
-- First migration: create tables
-- Seed migration: Big 4 + OpenRouter providers, initial model catalog
-- **Tests**: migration runs cleanly, seed data queryable, rollback works
-- **Verify**: `make migrate` → tables exist with seed data
+See "What's built" section above for details.
 
 ### Milestone 2 — Auth works (can log in via magic link)
 
