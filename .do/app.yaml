@@ -1,0 +1,99 @@
+name: nelson
+region: nyc
+
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+
+services:
+  - name: backend
+    dockerfile_path: backend/Dockerfile
+    source_dir: /
+    github:
+      repo: 0xc14m1z/nelson
+      branch: main
+      deploy_on_push: true
+    http_port: 8000
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 15
+      period_seconds: 10
+    routes:
+      - path: /api
+        preserve_path_prefix: true
+    envs:
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${db.DATABASE_URL}
+      - key: JWT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_IN_DO_DASHBOARD
+      - key: FERNET_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_IN_DO_DASHBOARD
+      - key: EMAIL_PROVIDER
+        scope: RUN_TIME
+        value: resend
+      - key: RESEND_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_IN_DO_DASHBOARD
+      - key: EMAIL_FROM
+        scope: RUN_TIME
+        value: nelson@yourdomain.com
+      - key: CORS_ORIGINS
+        scope: RUN_TIME
+        value: '["https://yourdomain.com"]'
+      - key: MAGIC_LINK_BASE_URL
+        scope: RUN_TIME
+        value: https://yourdomain.com/login/verify
+
+  - name: frontend
+    dockerfile_path: frontend/Dockerfile
+    source_dir: /
+    github:
+      repo: 0xc14m1z/nelson
+      branch: main
+      deploy_on_push: true
+    http_port: 3000
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    health_check:
+      http_path: /
+      initial_delay_seconds: 15
+      period_seconds: 10
+    routes:
+      - path: /
+    envs:
+      - key: BACKEND_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${backend.PRIVATE_URL}
+
+jobs:
+  - name: migrate
+    kind: PRE_DEPLOY
+    dockerfile_path: backend/Dockerfile
+    source_dir: /
+    github:
+      repo: 0xc14m1z/nelson
+      branch: main
+      deploy_on_push: true
+    run_command: uv run alembic upgrade head
+    instance_size_slug: basic-xxs
+    envs:
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${db.DATABASE_URL}
+
+databases:
+  - name: db
+    engine: PG
+    version: "16"
+    size: db-s-1vcpu-1gb
+    db_name: nelson
+    db_user: nelson
+    num_nodes: 1

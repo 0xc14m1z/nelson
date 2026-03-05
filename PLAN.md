@@ -5,8 +5,8 @@
 | Milestone | Status | PR |
 |-----------|--------|----|
 | 1 — Running skeleton | DONE | [#1](https://github.com/0xc14m1z/nelson/pull/1) (merged) |
-| 2 — Auth works | DONE | |
-| 2.5 — Deployed on App Platform | TODO | |
+| 2 — Auth works | DONE | [#2](https://github.com/0xc14m1z/nelson/pull/2) (merged) |
+| 2.5 — Deployed on App Platform | DONE | [#3](https://github.com/0xc14m1z/nelson/pull/3) |
 | 3 — API keys + model config | TODO | |
 | 4 — Core consensus | TODO | |
 | 5 — Live streaming UI | TODO | |
@@ -356,7 +356,16 @@ See "What's built" section above for details.
 **Task 2.2 — Auth backend** ✅
 **Task 2.3 — Auth frontend** ✅
 
-36 backend tests + 3 frontend tests passing. Design doc: `docs/plans/2026-03-04-milestone-2-auth-design.md`
+38 backend tests + 3 frontend tests passing. Design doc: `docs/plans/2026-03-04-milestone-2-auth-design.md`
+
+Post-review fixes (PR #2):
+- Cross-origin cookie fix: Next.js `rewrites` proxies `/api` to backend (same-origin cookies)
+- Async SMTP: `asyncio.to_thread()` wrapping for non-blocking email sends
+- Moved test helper (`extract_token_from_mailpit`) from production code to `tests/conftest.py`
+- Logout endpoint: `POST /api/auth/logout` revokes refresh token + clears cookie
+- Cookie path widened from `/api/auth/refresh` to `/api/auth` (shared by refresh + logout)
+- Frontend uses relative `/api/...` paths (no more `NEXT_PUBLIC_API_URL`)
+- Docker: `BACKEND_URL` build arg for frontend container (defaults to `http://localhost:8000`)
 
 ### Milestone 2.5 — Deployed on App Platform (deploy early, deploy often)
 

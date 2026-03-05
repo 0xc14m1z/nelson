@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Backend lint
+        working-directory: backend
+        run: |
+          uv sync --frozen --no-install-project
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Frontend lint
+        working-directory: frontend
+        run: |
+          bun install --frozen-lockfile
+          bun run lint
+
+  backend-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nelson
+          POSTGRES_PASSWORD: nelson
+          POSTGRES_DB: nelson
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nelson"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mailpit:
+        image: axllent/mailpit
+        ports:
+          - 1025:1025
+          - 8025:8025
+        options: >-
+          --health-cmd "wget --spider -q http://localhost:8025/api/v1/info"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://nelson:nelson@localhost:5432/nelson
+      JWT_SECRET: ci-test-secret
+      FERNET_KEY: 2lJYlIPWSL4O741w7QECrV46aeCY01t4zl2AwlVWNyI=
+      SMTP_HOST: localhost
+      SMTP_PORT: 1025
+      EMAIL_PROVIDER: smtp
+      EMAIL_FROM: nelson@localhost
+      CORS_ORIGINS: '["http://localhost:3000"]'
+      MAGIC_LINK_BASE_URL: http://localhost:3000/login/verify
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Run migrations
+        working-directory: backend
+        run: uv run alembic upgrade head
+
+      - name: Run tests
+        working-directory: backend
+        run: uv run pytest -v
+
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        working-directory: frontend
+        run: bun run test
