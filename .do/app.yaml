@@ -23,7 +23,6 @@ services:
     routes:
       - path: /api
         preserve_path_prefix: true
-      - path: /health
     envs:
       - key: DATABASE_URL
         scope: RUN_TIME
@@ -71,8 +70,24 @@ services:
       - path: /
     envs:
       - key: BACKEND_URL
-        scope: BUILD_TIME
+        scope: RUN_AND_BUILD_TIME
         value: ${backend.PRIVATE_URL}
+
+jobs:
+  - name: migrate
+    kind: PRE_DEPLOY
+    dockerfile_path: backend/Dockerfile
+    source_dir: /
+    github:
+      repo: 0xc14m1z/nelson
+      branch: main
+      deploy_on_push: true
+    run_command: uv run alembic upgrade head
+    instance_size_slug: basic-xxs
+    envs:
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${db.DATABASE_URL}
 
 databases:
   - name: db
