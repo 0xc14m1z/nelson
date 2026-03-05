@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.config import settings
 
+
 def _ensure_asyncpg_scheme(url: str) -> str:
     """Ensure the database URL uses the asyncpg driver.
 

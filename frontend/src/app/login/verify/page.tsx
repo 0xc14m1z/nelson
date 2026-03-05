@@ -12,12 +12,11 @@ function VerifyContent() {
   const { login } = useAuth();
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const token = searchParams.get("token");
-    const email = searchParams.get("email");
+  const token = searchParams.get("token");
+  const email = searchParams.get("email");
 
+  useEffect(() => {
     if (!token || !email) {
-      setError("Invalid link.");
       return;
     }
 
@@ -43,7 +42,29 @@ function VerifyContent() {
     }
 
     verify();
-  }, [searchParams, login, router]);
+  }, [token, email, login, router]);
+
+  if (!token || !email) {
+    return (
+      <Container
+        size="xs"
+        py="xl"
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Stack align="center">
+          <Text c="red">Invalid link.</Text>
+          <Button variant="outline" onClick={() => router.push("/login")}>
+            Back to login
+          </Button>
+        </Stack>
+      </Container>
+    );
+  }
 
   return (
     <Container
