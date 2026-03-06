@@ -41,6 +41,10 @@ class LLMCallResponse(BaseModel):
     cost: float
     duration_ms: int
     error: str | None
+    confidence: float | None
+    key_points: list[str] | None
+    has_disagreements: bool | None
+    disagreements: list[str] | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

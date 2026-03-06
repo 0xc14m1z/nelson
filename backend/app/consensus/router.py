@@ -148,7 +148,14 @@ async def _session_event_generator(request: Request, session_id: UUID, user_id: 
                     "role": call.role,
                     "response": call.response,
                     "error": call.error,
-                    "structured": {},
+                    "structured": {
+                        k: v for k, v in {
+                            "confidence": call.confidence,
+                            "key_points": call.key_points,
+                            "has_disagreements": call.has_disagreements,
+                            "disagreements": call.disagreements,
+                        }.items() if v is not None
+                    },
                     "input_tokens": call.input_tokens or 0,
                     "output_tokens": call.output_tokens or 0,
                     "cost": float(call.cost) if call.cost else 0,
@@ -210,7 +217,14 @@ async def _session_event_generator(request: Request, session_id: UUID, user_id: 
                     "role": call.role,
                     "response": call.response,
                     "error": call.error,
-                    "structured": {},
+                    "structured": {
+                        k: v for k, v in {
+                            "confidence": call.confidence,
+                            "key_points": call.key_points,
+                            "has_disagreements": call.has_disagreements,
+                            "disagreements": call.disagreements,
+                        }.items() if v is not None
+                    },
                     "input_tokens": call.input_tokens or 0,
                     "output_tokens": call.output_tokens or 0,
                     "cost": float(call.cost) if call.cost else 0,
@@ -301,6 +315,10 @@ async def get_session(
             cost=float(c.cost),
             duration_ms=c.duration_ms,
             error=c.error,
+            confidence=c.confidence,
+            key_points=c.key_points,
+            has_disagreements=c.has_disagreements,
+            disagreements=c.disagreements,
             created_at=c.created_at,
         )
         for c in calls

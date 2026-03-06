@@ -199,6 +199,58 @@ async def test_delete_session_not_found():
 
 
 @pytest.mark.asyncio
+async def test_get_session_detail_includes_structured_fields():
+    """Verify that GET /api/sessions/{id} returns structured fields in llm_calls."""
+    import asyncio
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        token = await _get_auth_token(client, "sess-structured@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+        model_ids = await _get_model_ids(client)
+
+        with (
+            responder_agent.override(model=TestModel()),
+            critic_agent.override(model=TestModel()),
+            summarizer_agent.override(model=TestModel()),
+        ):
+            create_resp = await client.post(
+                "/api/sessions",
+                json={
+                    "enquiry": "Structured fields test question",
+                    "model_ids": model_ids,
+                },
+                headers=headers,
+            )
+            assert create_resp.status_code == 201
+            session_id = create_resp.json()["id"]
+
+            # Wait for background orchestrator to finish
+            await asyncio.sleep(3)
+
+        resp = await client.get(
+            f"/api/sessions/{session_id}", headers=headers
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["llm_calls"]) > 0
+
+        # Check that structured fields are present in the response schema
+        for call in data["llm_calls"]:
+            # All calls should have these keys (even if null)
+            assert "confidence" in call
+            assert "key_points" in call
+            assert "has_disagreements" in call
+            assert "disagreements" in call
+
+        # Critic calls should have structured data populated by TestModel
+        critic_calls = [c for c in data["llm_calls"] if c["role"] == "critic"]
+        assert len(critic_calls) > 0
+        for call in critic_calls:
+            assert call["has_disagreements"] is not None
+
+
+@pytest.mark.asyncio
 async def test_list_sessions_pagination():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
