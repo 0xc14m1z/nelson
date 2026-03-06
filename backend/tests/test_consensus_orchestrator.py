@@ -94,6 +94,7 @@ async def test_orchestrator_convergence(db_session):
 
 @pytest.mark.asyncio
 async def test_orchestrator_max_rounds(db_session):
+    """Use a critic TestModel that always disagrees, forcing max_rounds to be hit."""
     user, provider, m1, m2 = await _create_test_data(db_session)
 
     session = Session(
@@ -106,16 +107,22 @@ async def test_orchestrator_max_rounds(db_session):
 
     orchestrator = ConsensusOrchestrator(session.id, user.id)
 
+    # Critic always returns has_disagreements=True so consensus is never reached
+    disagreeing_critic = TestModel(
+        custom_output_args={"has_disagreements": True, "disagreements": ["still disagree"], "revised_response": "my revised answer"}
+    )
+
     with (
         responder_agent.override(model=TestModel()),
-        critic_agent.override(model=TestModel()),
+        critic_agent.override(model=disagreeing_critic),
         summarizer_agent.override(model=TestModel()),
     ):
         await orchestrator.run()
 
     await db_session.refresh(session)
-    assert session.status in ("consensus_reached", "max_rounds_reached")
+    assert session.status == "max_rounds_reached"
     assert session.completed_at is not None
+    assert session.current_round == 3
 
     # Cleanup
     result = await db_session.execute(
