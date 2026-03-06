@@ -56,3 +56,60 @@ export const MODEL_COLORS = [
   "teal",
   "indigo",
 ] as const;
+
+// --- Streaming event types ---
+
+export interface ModelStartEvent {
+  llm_model_id: string;
+  round_number: number;
+  role: "responder" | "critic";
+}
+
+export interface TokenDeltaEvent {
+  llm_model_id: string;
+  round_number: number;
+  delta: string;
+}
+
+export interface ModelDoneEvent {
+  llm_model_id: string;
+  round_number: number;
+  role: "responder" | "critic" | "summarizer";
+  response?: string;
+  error?: string | null;
+  structured: Record<string, unknown>;
+  input_tokens: number;
+  output_tokens: number;
+  cost: number;
+  duration_ms: number;
+}
+
+export interface ModelErrorEvent {
+  llm_model_id: string;
+  round_number: number;
+  error: string;
+}
+
+export interface ModelCatchupEvent {
+  llm_model_id: string;
+  text_so_far: string;
+}
+
+export interface PhaseChangeEvent {
+  phase: string;
+  round_number: number;
+  models: Array<{
+    llm_model_id: string;
+    model_name: string;
+    confidence?: number;
+    key_points?: string[];
+    disagreements?: string[];
+  }>;
+}
+
+export interface RoundSummaryEvent {
+  round_number: number;
+  agreements: string[];
+  disagreements: string[];
+  shifts: string[];
+}
