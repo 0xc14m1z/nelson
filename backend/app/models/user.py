@@ -1,9 +1,16 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UpdatedAtMixin, UUIDPrimaryKey
+
+user_default_models = Table(
+    "user_default_models",
+    Base.metadata,
+    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("llm_model_id", ForeignKey("llm_models.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class User(UUIDPrimaryKey, TimestampMixin, UpdatedAtMixin, Base):

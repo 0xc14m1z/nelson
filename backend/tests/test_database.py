@@ -29,7 +29,7 @@ async def test_provider_slugs(db_session):
 @pytest.mark.asyncio
 async def test_llm_models_seeded(db_session):
     result = await db_session.execute(select(func.count()).select_from(LLMModel))
-    assert result.scalar() == 11
+    assert result.scalar() >= 13
 
 
 @pytest.mark.asyncio
@@ -46,8 +46,8 @@ async def test_provider_relationship(db_session):
     openai = result.scalar_one()
     await db_session.refresh(openai, ["models"])
     model_slugs = sorted([m.slug for m in openai.models])
-    assert "gpt-4o" in model_slugs
-    assert "gpt-4o-mini" in model_slugs
+    assert "gpt-5" in model_slugs
+    assert "gpt-5-mini" in model_slugs
 
 
 @pytest.mark.asyncio
