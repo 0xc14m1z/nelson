@@ -4,12 +4,19 @@ import time
 from datetime import UTC, datetime
 from uuid import UUID
 
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.consensus_agent import critic_agent, responder_agent, summarizer_agent
 from app.agent.model_registry import NoKeyAvailableError, resolve_model
 from app.agent.prompts import build_critic_prompt, build_responder_prompt, build_summarizer_prompt
+from app.consensus.broadcast import (
+    Broadcast,
+    StreamEvent,
+    register_broadcast,
+    unregister_broadcast,
+)
 from app.database import async_session_factory
 from app.models import LLMCall, LLMModel, Session, UserSettings
 
@@ -48,8 +55,25 @@ class ConsensusOrchestrator:
         self.semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
         self._active_models: list[LLMModel] = []
         self._heartbeat_task: asyncio.Task | None = None
+        self.broadcast = Broadcast()
+
+    def _model_id_str(self, model: LLMModel) -> str:
+        return str(model.id)
+
+    def _model_name(self, model: LLMModel) -> str:
+        return (
+            f"{model.provider.slug}/{model.slug}" if model.provider else model.slug
+        )
 
     async def run(self) -> None:
+        register_broadcast(self.session_id, self.broadcast)
+        try:
+            await self._run_inner()
+        finally:
+            unregister_broadcast(self.session_id)
+            self.broadcast.close()
+
+    async def _run_inner(self) -> None:
         async with async_session_factory() as db:
             session = await db.get(Session, self.session_id)
             if not session:
@@ -73,6 +97,24 @@ class ConsensusOrchestrator:
                 if len(self._active_models) < 2:
                     await self._fail_session(db, session, start_time)
                     return
+
+                # Push phase_change after responder round
+                self.broadcast.push(StreamEvent(
+                    event="phase_change",
+                    data={
+                        "phase": "responder_done",
+                        "round_number": 1,
+                        "models": [
+                            {
+                                "llm_model_id": r["llm_model_id"],
+                                "model_name": r["model_name"],
+                                "confidence": r.get("confidence"),
+                                "key_points": r.get("key_points"),
+                            }
+                            for r in round1_responses
+                        ],
+                    },
+                ))
 
                 # Rounds 2+: Critique loop
                 prior_summary: str | None = None
@@ -102,9 +144,30 @@ class ConsensusOrchestrator:
                         not cr["has_disagreements"] for cr in critique_results
                     )
                     latest_responses = [
-                        {"model_name": cr["model_name"], "response": cr["response"]}
+                        {
+                            "llm_model_id": cr["llm_model_id"],
+                            "model_name": cr["model_name"],
+                            "response": cr["response"],
+                        }
                         for cr in critique_results
                     ]
+
+                    # Push phase_change after critic round
+                    self.broadcast.push(StreamEvent(
+                        event="phase_change",
+                        data={
+                            "phase": "critic_done",
+                            "round_number": round_num,
+                            "models": [
+                                {
+                                    "llm_model_id": cr["llm_model_id"],
+                                    "model_name": cr["model_name"],
+                                    "disagreements": cr.get("disagreements"),
+                                }
+                                for cr in critique_results
+                            ],
+                        },
+                    ))
 
                     if all_agree:
                         session.status = "consensus_reached"
@@ -117,6 +180,12 @@ class ConsensusOrchestrator:
                 session.completed_at = datetime.now(UTC)
                 await self._update_session_totals(db, session)
                 await db.commit()
+
+                # Push terminal event
+                self.broadcast.push(StreamEvent(
+                    event=session.status,
+                    data={"status": session.status},
+                ))
 
             except Exception:
                 await self._fail_session(db, session, start_time)
@@ -133,7 +202,7 @@ class ConsensusOrchestrator:
 
     async def _run_responder_round(
         self, db: AsyncSession, session: Session
-    ) -> list[dict[str, str]]:
+    ) -> list[dict]:
         prompt = build_responder_prompt(session.enquiry)
         tasks = [
             self._call_responder(db, session, model, prompt)
@@ -146,6 +215,15 @@ class ConsensusOrchestrator:
             if isinstance(result, Exception):
                 await self._record_error(db, session, model, 1, "responder", str(result))
                 self._active_models.remove(model)
+                self.broadcast.push(StreamEvent(
+                    event="model_error",
+                    data={
+                        "llm_model_id": self._model_id_str(model),
+                        "model_name": self._model_name(model),
+                        "round_number": 1,
+                        "error": str(result),
+                    },
+                ))
             else:
                 responses.append(result)
         await db.commit()
@@ -153,19 +231,60 @@ class ConsensusOrchestrator:
 
     async def _call_responder(
         self, db: AsyncSession, session: Session, model: LLMModel, prompt: str
-    ) -> dict[str, str]:
+    ) -> dict:
         async with self.semaphore:
             resolved = await self._try_resolve(model, db)
+            model_id_str = self._model_id_str(model)
+            model_name = self._model_name(model)
             start = time.monotonic()
 
+            self.broadcast.push(StreamEvent(
+                event="model_start",
+                data={
+                    "llm_model_id": model_id_str,
+                    "model_name": model_name,
+                    "round_number": 1,
+                    "role": "responder",
+                },
+            ))
+
             with _resolve_override(responder_agent, resolved):
-                result = await asyncio.wait_for(
-                    responder_agent.run(prompt),
-                    timeout=LLM_TIMEOUT_SECONDS,
-                )
+                try:
+                    async with asyncio.timeout(LLM_TIMEOUT_SECONDS):
+                        async with responder_agent.run_stream(prompt) as result:
+                            prev_text = ""
+                            async for response, last in result.stream_responses(
+                                debounce_by=0.01,
+                            ):
+                                try:
+                                    partial = await result.validate_response_output(
+                                        response, allow_partial=not last,
+                                    )
+                                    current_text = partial.response
+                                    if len(current_text) > len(prev_text):
+                                        delta = current_text[len(prev_text):]
+                                        self.broadcast.accumulate_text(
+                                            model_id_str, delta,
+                                        )
+                                        self.broadcast.push(StreamEvent(
+                                            event="token_delta",
+                                            data={
+                                                "llm_model_id": model_id_str,
+                                                "round_number": 1,
+                                                "delta": delta,
+                                            },
+                                        ))
+                                        prev_text = current_text
+                                except ValidationError:
+                                    continue
+                            output = await result.get_output()
+                            usage = result.usage()
+                except TimeoutError:
+                    raise TimeoutError(
+                        f"Timed out after {LLM_TIMEOUT_SECONDS}s"
+                    )
 
             elapsed_ms = int((time.monotonic() - start) * 1000)
-            usage = result.usage()
 
             call = LLMCall(
                 session_id=session.id,
@@ -173,7 +292,7 @@ class ConsensusOrchestrator:
                 round_number=1,
                 role="responder",
                 prompt=prompt,
-                response=result.output.response,
+                response=output.response,
                 input_tokens=usage.input_tokens or 0,
                 output_tokens=usage.output_tokens or 0,
                 cost=0,
@@ -181,22 +300,41 @@ class ConsensusOrchestrator:
             )
             db.add(call)
 
-            model_name = (
-                f"{model.provider.slug}/{model.slug}" if model.provider else model.slug
-            )
-            return {"model_name": model_name, "response": result.output.response}
+            self.broadcast.clear_text(model_id_str)
+            self.broadcast.push(StreamEvent(
+                event="model_done",
+                data={
+                    "llm_model_id": model_id_str,
+                    "model_name": model_name,
+                    "round_number": 1,
+                    "role": "responder",
+                },
+            ))
+
+            return {
+                "llm_model_id": model_id_str,
+                "model_name": model_name,
+                "response": output.response,
+                "confidence": output.confidence,
+                "key_points": output.key_points,
+            }
 
     async def _run_critic_round(
         self,
         db: AsyncSession,
         session: Session,
-        latest_responses: list[dict[str, str]],
+        latest_responses: list[dict],
         prior_summary: str | None,
         round_number: int,
     ) -> list[dict]:
+        # build_critic_prompt expects dicts with 'model_name' and 'response' keys
+        prompt_responses = [
+            {"model_name": r["model_name"], "response": r["response"]}
+            for r in latest_responses
+        ]
         tasks = [
             self._call_critic(
-                db, session, model, latest_responses, prior_summary, round_number
+                db, session, model, prompt_responses, prior_summary, round_number
             )
             for model in list(self._active_models)
         ]
@@ -209,6 +347,15 @@ class ConsensusOrchestrator:
                     db, session, model, round_number, "critic", str(result)
                 )
                 self._active_models.remove(model)
+                self.broadcast.push(StreamEvent(
+                    event="model_error",
+                    data={
+                        "llm_model_id": self._model_id_str(model),
+                        "model_name": self._model_name(model),
+                        "round_number": round_number,
+                        "error": str(result),
+                    },
+                ))
             else:
                 critique_results.append(result)
         await db.commit()
@@ -219,23 +366,66 @@ class ConsensusOrchestrator:
         db: AsyncSession,
         session: Session,
         model: LLMModel,
-        latest_responses: list[dict[str, str]],
+        prompt_responses: list[dict[str, str]],
         prior_summary: str | None,
         round_number: int,
     ) -> dict:
         async with self.semaphore:
             resolved = await self._try_resolve(model, db)
-            prompt = build_critic_prompt(session.enquiry, prior_summary, latest_responses)
+            model_id_str = self._model_id_str(model)
+            model_name = self._model_name(model)
+            prompt = build_critic_prompt(
+                session.enquiry, prior_summary, prompt_responses,
+            )
             start = time.monotonic()
 
+            self.broadcast.push(StreamEvent(
+                event="model_start",
+                data={
+                    "llm_model_id": model_id_str,
+                    "model_name": model_name,
+                    "round_number": round_number,
+                    "role": "critic",
+                },
+            ))
+
             with _resolve_override(critic_agent, resolved):
-                result = await asyncio.wait_for(
-                    critic_agent.run(prompt),
-                    timeout=LLM_TIMEOUT_SECONDS,
-                )
+                try:
+                    async with asyncio.timeout(LLM_TIMEOUT_SECONDS):
+                        async with critic_agent.run_stream(prompt) as result:
+                            prev_text = ""
+                            async for response, last in result.stream_responses(
+                                debounce_by=0.01,
+                            ):
+                                try:
+                                    partial = await result.validate_response_output(
+                                        response, allow_partial=not last,
+                                    )
+                                    current_text = partial.revised_response
+                                    if len(current_text) > len(prev_text):
+                                        delta = current_text[len(prev_text):]
+                                        self.broadcast.accumulate_text(
+                                            model_id_str, delta,
+                                        )
+                                        self.broadcast.push(StreamEvent(
+                                            event="token_delta",
+                                            data={
+                                                "llm_model_id": model_id_str,
+                                                "round_number": round_number,
+                                                "delta": delta,
+                                            },
+                                        ))
+                                        prev_text = current_text
+                                except ValidationError:
+                                    continue
+                            output = await result.get_output()
+                            usage = result.usage()
+                except TimeoutError:
+                    raise TimeoutError(
+                        f"Timed out after {LLM_TIMEOUT_SECONDS}s"
+                    )
 
             elapsed_ms = int((time.monotonic() - start) * 1000)
-            usage = result.usage()
 
             call = LLMCall(
                 session_id=session.id,
@@ -243,7 +433,7 @@ class ConsensusOrchestrator:
                 round_number=round_number,
                 role="critic",
                 prompt=prompt,
-                response=result.output.revised_response,
+                response=output.revised_response,
                 input_tokens=usage.input_tokens or 0,
                 output_tokens=usage.output_tokens or 0,
                 cost=0,
@@ -251,22 +441,38 @@ class ConsensusOrchestrator:
             )
             db.add(call)
 
-            model_name = (
-                f"{model.provider.slug}/{model.slug}" if model.provider else model.slug
-            )
+            self.broadcast.clear_text(model_id_str)
+            self.broadcast.push(StreamEvent(
+                event="model_done",
+                data={
+                    "llm_model_id": model_id_str,
+                    "model_name": model_name,
+                    "round_number": round_number,
+                    "role": "critic",
+                },
+            ))
+
             return {
+                "llm_model_id": model_id_str,
                 "model_name": model_name,
-                "response": result.output.revised_response,
-                "has_disagreements": result.output.has_disagreements,
+                "response": output.revised_response,
+                "has_disagreements": output.has_disagreements,
+                "disagreements": output.disagreements,
             }
 
     async def _run_summarizer(
         self,
         db: AsyncSession,
         session: Session,
-        responses: list[dict[str, str]],
+        responses: list[dict],
         round_number: int,
     ) -> str:
+        # build_summarizer_prompt expects dicts with 'model_name' and 'response'
+        prompt_responses = [
+            {"model_name": r["model_name"], "response": r["response"]}
+            for r in responses
+        ]
+
         # Get user's summarizer model
         settings = await db.execute(
             select(UserSettings).where(UserSettings.user_id == session.user_id)
@@ -289,10 +495,11 @@ class ConsensusOrchestrator:
         if not summarizer_llm:
             # Fallback: return concatenated responses as "summary"
             return "\n".join(
-                f"{r['model_name']}: {r['response'][:200]}" for r in responses
+                f"{r['model_name']}: {r['response'][:200]}"
+                for r in prompt_responses
             )
 
-        prompt = build_summarizer_prompt(responses)
+        prompt = build_summarizer_prompt(prompt_responses)
         start = time.monotonic()
 
         try:
@@ -321,11 +528,25 @@ class ConsensusOrchestrator:
             )
             db.add(call)
             await db.commit()
+
+            # Push round_summary event
+            self.broadcast.push(StreamEvent(
+                event="round_summary",
+                data={
+                    "round_number": round_number,
+                    "summary": result.output.summary,
+                    "agreements": result.output.agreements,
+                    "disagreements": result.output.disagreements,
+                    "shifts": result.output.shifts,
+                },
+            ))
+
             return result.output.summary
 
         except Exception:
             return "\n".join(
-                f"{r['model_name']}: {r['response'][:200]}" for r in responses
+                f"{r['model_name']}: {r['response'][:200]}"
+                for r in prompt_responses
             )
 
     async def _record_error(
@@ -354,6 +575,10 @@ class ConsensusOrchestrator:
         session.completed_at = datetime.now(UTC)
         await self._update_session_totals(db, session)
         await db.commit()
+        self.broadcast.push(StreamEvent(
+            event="failed",
+            data={"status": "failed"},
+        ))
 
     async def _update_session_totals(
         self, db: AsyncSession, session: Session

@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -7,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.consensus_agent import critic_agent, responder_agent, summarizer_agent
+from app.consensus.broadcast import StreamEvent, get_broadcast
 from app.consensus.service import ConsensusOrchestrator, cleanup_orphaned_sessions
 from app.database import engine
 from app.models import LLMCall, LLMModel, Provider, Session, User
@@ -203,5 +205,81 @@ async def test_cleanup_orphaned_sessions(db_session):
 
     # Cleanup
     await db_session.delete(session)
+    await db_session.delete(user)
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_emits_streaming_events(db_session):
+    """Verify the orchestrator pushes model_start, model_done, phase_change,
+    round_summary, and terminal events via the broadcast."""
+    user, provider, m1, m2 = await _create_test_data(db_session)
+
+    session = Session(user_id=user.id, enquiry="Explain gravity")
+    session.models = [m1, m2]
+    db_session.add(session)
+    await db_session.commit()
+    await db_session.refresh(session)
+
+    orchestrator = ConsensusOrchestrator(session.id, user.id)
+
+    # Subscribe to broadcast BEFORE run() so we capture all events
+    consumer = orchestrator.broadcast.subscribe()
+
+    collected: list[StreamEvent] = []
+
+    async def _collect():
+        async for event in consumer:
+            collected.append(event)
+
+    with (
+        responder_agent.override(model=TestModel()),
+        critic_agent.override(model=TestModel()),
+        summarizer_agent.override(model=TestModel()),
+    ):
+        collector_task = asyncio.create_task(_collect())
+        await orchestrator.run()
+        # broadcast.close() was called by run(), so consumer will stop
+        await collector_task
+
+    event_types = [e.event for e in collected]
+
+    # Should have model_start and model_done for each model in responder round
+    assert event_types.count("model_start") >= 2
+    assert event_types.count("model_done") >= 2
+
+    # Should have at least one phase_change (responder_done after round 1)
+    assert "phase_change" in event_types
+    phase_events = [e for e in collected if e.event == "phase_change"]
+    assert any(e.data["phase"] == "responder_done" for e in phase_events)
+
+    # Should have critic_done phase_change (round 2)
+    assert any(
+        e.data.get("phase") == "critic_done" for e in phase_events
+    )
+
+    # Should have a terminal event
+    assert "consensus_reached" in event_types or "max_rounds_reached" in event_types
+
+    # After run, broadcast should be unregistered
+    assert get_broadcast(session.id) is None
+
+    # Verify token_delta events were emitted
+    assert "token_delta" in event_types
+    delta_events = [e for e in collected if e.event == "token_delta"]
+    assert all("delta" in e.data for e in delta_events)
+    assert all("llm_model_id" in e.data for e in delta_events)
+
+    # Cleanup
+    await db_session.refresh(session)
+    result = await db_session.execute(
+        select(LLMCall).where(LLMCall.session_id == session.id)
+    )
+    for call in result.scalars().all():
+        await db_session.delete(call)
+    await db_session.delete(session)
+    await db_session.delete(m1)
+    await db_session.delete(m2)
+    await db_session.delete(provider)
     await db_session.delete(user)
     await db_session.commit()
