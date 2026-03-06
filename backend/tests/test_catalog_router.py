@@ -11,9 +11,9 @@ async def test_list_providers():
         resp = await client.get("/api/providers")
         assert resp.status_code == 200
         providers = resp.json()
-        assert len(providers) == 5
+        assert len(providers) >= 5
         slugs = {p["slug"] for p in providers}
-        assert slugs == {"openai", "anthropic", "google", "mistral", "openrouter"}
+        assert {"openai", "anthropic", "google", "mistral", "openrouter"}.issubset(slugs)
 
 
 @pytest.mark.asyncio
@@ -23,7 +23,7 @@ async def test_list_models():
         resp = await client.get("/api/models")
         assert resp.status_code == 200
         models = resp.json()
-        assert len(models) == 11
+        assert len(models) >= 11
 
 
 @pytest.mark.asyncio

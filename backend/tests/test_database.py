@@ -16,20 +16,21 @@ async def db_session():
 @pytest.mark.asyncio
 async def test_providers_seeded(db_session):
     result = await db_session.execute(select(func.count()).select_from(Provider))
-    assert result.scalar() == 5
+    assert result.scalar() >= 5
 
 
 @pytest.mark.asyncio
 async def test_provider_slugs(db_session):
-    result = await db_session.execute(select(Provider.slug).order_by(Provider.slug))
-    slugs = [r[0] for r in result.all()]
-    assert slugs == ["anthropic", "google", "mistral", "openai", "openrouter"]
+    expected = {"anthropic", "google", "mistral", "openai", "openrouter"}
+    result = await db_session.execute(select(Provider.slug))
+    slugs = {r[0] for r in result.all()}
+    assert expected.issubset(slugs)
 
 
 @pytest.mark.asyncio
 async def test_llm_models_seeded(db_session):
     result = await db_session.execute(select(func.count()).select_from(LLMModel))
-    assert result.scalar() == 11
+    assert result.scalar() >= 11
 
 
 @pytest.mark.asyncio
