@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Alert, Badge, Box, Group, Loader, Paper, ScrollArea, Text } from "@mantine/core";
 import { IconAlertTriangle, IconCheck } from "@tabler/icons-react";
 import type { ModelStreamState } from "@/hooks/useConsensusStream";
+import { MarkdownContent } from "./MarkdownContent";
 
 interface StreamingColumnProps {
   model: ModelStreamState;
@@ -22,20 +23,15 @@ export function StreamingColumn({ model, displayName, allModelsDone }: Streaming
   }, [model.text]);
 
   return (
-    <Paper
-      p="md"
-      radius="md"
-      withBorder
+    <Box
       style={{
         flex: "1 1 0",
-        minWidth: 350,
-        display: "flex",
-        flexDirection: "column",
+        minWidth: 700,
         opacity: model.error ? 0.5 : 1,
       }}
     >
-      {/* Header */}
-      <Group justify="space-between" mb="sm">
+      {/* Header — outside the container */}
+      <Group justify="space-between" mb="xs">
         <Text fw={600} size="sm">
           {displayName}
         </Text>
@@ -62,13 +58,10 @@ export function StreamingColumn({ model, displayName, allModelsDone }: Streaming
         )}
       </Group>
 
-      {/* Scrollable text area */}
-      <ScrollArea
-        style={{ flex: 1, minHeight: 200 }}
-        viewportRef={viewportRef}
-      >
-        <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
-          {model.text}
+      {/* Message container */}
+      <Paper p="md" radius="md" withBorder>
+        <ScrollArea viewportRef={viewportRef}>
+          <MarkdownContent>{model.text}</MarkdownContent>
           {model.isStreaming && (
             <Box
               component="span"
@@ -80,26 +73,26 @@ export function StreamingColumn({ model, displayName, allModelsDone }: Streaming
               |
             </Box>
           )}
-        </Text>
 
-        {model.isDone && !model.error && !allModelsDone && (
-          <Text size="sm" c="dimmed" fs="italic" mt="xs">
-            Waiting for other models to finish...
-          </Text>
+          {model.isDone && !model.error && !allModelsDone && (
+            <Text size="sm" c="dimmed" fs="italic" mt="xs">
+              Waiting for other models to finish...
+            </Text>
+          )}
+        </ScrollArea>
+
+        {/* Error alert */}
+        {model.isDone && model.error && (
+          <Alert
+            color="red"
+            title="Model Error"
+            mt="sm"
+            icon={<IconAlertTriangle size={16} />}
+          >
+            <Text size="sm">{model.error}</Text>
+          </Alert>
         )}
-      </ScrollArea>
-
-      {/* Error alert */}
-      {model.isDone && model.error && (
-        <Alert
-          color="red"
-          title="Model Error"
-          mt="sm"
-          icon={<IconAlertTriangle size={16} />}
-        >
-          <Text size="sm">{model.error}</Text>
-        </Alert>
-      )}
-    </Paper>
+      </Paper>
+    </Box>
   );
 }

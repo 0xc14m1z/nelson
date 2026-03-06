@@ -29,6 +29,15 @@ vi.mock("@tabler/icons-react", () => {
   return { IconAlertTriangle: icon(), IconCheck: icon() };
 });
 
+vi.mock("../MarkdownContent", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const R = require("react");
+  return {
+    MarkdownContent: (props: { children: string }) =>
+      R.createElement("div", null, props.children),
+  };
+});
+
 import { StreamingColumn } from "../StreamingColumn";
 
 const baseModel: ModelStreamState = {
