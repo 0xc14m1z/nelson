@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import ARRAY, Boolean, Float, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKey
@@ -25,6 +25,10 @@ class LLMCall(UUIDPrimaryKey, TimestampMixin, Base):
     cost: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=0)
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    key_points: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    has_disagreements: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    disagreements: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
 
     session = relationship("Session", back_populates="llm_calls")
     llm_model = relationship("LLMModel")
