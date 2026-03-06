@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SSE } from "sse.js";
 import { getAccessToken } from "@/lib/api";
 import type {
-  LLMCallEvent,
   ModelCatchupEvent,
   ModelDoneEvent,
   ModelErrorEvent,
@@ -187,14 +186,28 @@ export function useConsensusStream({ sessionId, enabled = true }: UseConsensusSt
     source.addEventListener("model_catchup", (e: MessageEvent) => {
       try {
         const data: ModelCatchupEvent = JSON.parse(e.data);
+        const key = modelKey(data.llm_model_id, data.round_number);
         setState((prev) => {
           const next = new Map(prev.models);
-          // Find the latest entry for this model and update its text
-          for (const [key, model] of next) {
-            if (model.llm_model_id === data.llm_model_id && model.isStreaming) {
-              next.set(key, { ...model, text: data.text_so_far });
-              break;
-            }
+          const existing = next.get(key);
+          if (existing) {
+            next.set(key, { ...existing, text: data.text_so_far });
+          } else {
+            // Catchup arrived before model_start — create entry implicitly
+            next.set(key, {
+              llm_model_id: data.llm_model_id,
+              round_number: data.round_number,
+              role: data.role,
+              text: data.text_so_far,
+              isStreaming: true,
+              isDone: false,
+              error: null,
+              structured: {},
+              input_tokens: 0,
+              output_tokens: 0,
+              cost: 0,
+              duration_ms: 0,
+            });
           }
           return { ...prev, models: next };
         });
@@ -289,26 +302,5 @@ export function useConsensusStream({ sessionId, enabled = true }: UseConsensusSt
     }));
   }, []);
 
-  // Backward-compat: derive LLMCallEvent[] from models map for old session detail page.
-  // TODO: Remove once session detail page is rewritten (Task 8).
-  const events: LLMCallEvent[] = useMemo(() => {
-    return [...state.models.values()]
-      .filter((m) => m.isDone)
-      .map((m) => ({
-        id: `${m.llm_model_id}-${m.round_number}`,
-        model_slug: m.llm_model_id,
-        provider_slug: "",
-        model_name: m.llm_model_id,
-        round_number: m.round_number,
-        role: m.role,
-        response: m.text,
-        error: m.error,
-        input_tokens: m.input_tokens,
-        output_tokens: m.output_tokens,
-        cost: m.cost,
-        duration_ms: m.duration_ms,
-      }));
-  }, [state.models]);
-
-  return { ...state, events, togglePhase };
+  return { ...state, togglePhase };
 }

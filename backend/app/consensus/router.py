@@ -184,7 +184,37 @@ async def _session_event_generator(request: Request, session_id: UUID, user_id: 
                 "event": "model_catchup",
                 "data": json.dumps({
                     "llm_model_id": model_id,
-                    "text": text_so_far,
+                    "text_so_far": text_so_far,
+                    "round_number": session.current_round,
+                    "role": "critic" if session.status == "critiquing" else "responder",
+                }),
+            }
+
+        # ── 3b. Gap check — catch any LLM calls created after initial replay ─
+        gap_result = await db.execute(
+            select(LLMCall)
+            .where(
+                LLMCall.session_id == session_id,
+                LLMCall.id.notin_([c.id for c in calls]),
+            )
+            .order_by(LLMCall.round_number, LLMCall.created_at)
+        )
+        gap_calls = gap_result.scalars().all()
+
+        for call in gap_calls:
+            yield {
+                "event": "model_done" if not call.error else "model_error",
+                "data": json.dumps({
+                    "llm_model_id": str(call.llm_model_id),
+                    "round_number": call.round_number,
+                    "role": call.role,
+                    "response": call.response,
+                    "error": call.error,
+                    "structured": {},
+                    "input_tokens": call.input_tokens or 0,
+                    "output_tokens": call.output_tokens or 0,
+                    "cost": float(call.cost) if call.cost else 0,
+                    "duration_ms": call.duration_ms or 0,
                 }),
             }
 

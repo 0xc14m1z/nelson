@@ -93,6 +93,8 @@ export interface ModelErrorEvent {
 export interface ModelCatchupEvent {
   llm_model_id: string;
   text_so_far: string;
+  round_number: number;
+  role: "responder" | "critic";
 }
 
 export interface PhaseChangeEvent {

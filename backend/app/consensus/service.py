@@ -308,6 +308,15 @@ class ConsensusOrchestrator:
                     "model_name": model_name,
                     "round_number": 1,
                     "role": "responder",
+                    "response": output.response,
+                    "structured": {
+                        "confidence": output.confidence,
+                        "key_points": output.key_points,
+                    },
+                    "input_tokens": usage.input_tokens or 0,
+                    "output_tokens": usage.output_tokens or 0,
+                    "cost": 0,
+                    "duration_ms": elapsed_ms,
                 },
             ))
 
@@ -449,6 +458,15 @@ class ConsensusOrchestrator:
                     "model_name": model_name,
                     "round_number": round_number,
                     "role": "critic",
+                    "response": output.revised_response,
+                    "structured": {
+                        "has_disagreements": output.has_disagreements,
+                        "disagreements": output.disagreements,
+                    },
+                    "input_tokens": usage.input_tokens or 0,
+                    "output_tokens": usage.output_tokens or 0,
+                    "cost": 0,
+                    "duration_ms": elapsed_ms,
                 },
             ))
 
