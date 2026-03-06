@@ -10,7 +10,9 @@ class InitialResponse(BaseModel):
 class CritiqueResponse(BaseModel):
     has_disagreements: bool = Field(description="Whether disagreements remain with other models")
     disagreements: list[str] = Field(description="Specific points of disagreement")
-    revised_response: str = Field(description="Updated answer incorporating valid points from others")
+    revised_response: str = Field(
+        description="Updated answer incorporating valid points from others",
+    )
 
 
 class RoundSummary(BaseModel):

@@ -51,6 +51,7 @@ export default function SessionPage() {
       grouped.set(event.round_number, existing);
     }
     return grouped;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.events]);
 
   // Auto-scroll to bottom

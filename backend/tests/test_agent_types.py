@@ -1,5 +1,5 @@
-from app.agent.types import CritiqueResponse, InitialResponse, RoundSummary
 from app.agent.prompts import build_critic_prompt, build_responder_prompt, build_summarizer_prompt
+from app.agent.types import CritiqueResponse, InitialResponse, RoundSummary
 
 
 def test_initial_response_schema():

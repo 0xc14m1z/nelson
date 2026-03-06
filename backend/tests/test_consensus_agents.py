@@ -1,4 +1,3 @@
-import pytest
 from pydantic_ai.models.test import TestModel
 
 from app.agent.consensus_agent import critic_agent, responder_agent, summarizer_agent

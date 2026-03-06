@@ -109,7 +109,11 @@ async def test_orchestrator_max_rounds(db_session):
 
     # Critic always returns has_disagreements=True so consensus is never reached
     disagreeing_critic = TestModel(
-        custom_output_args={"has_disagreements": True, "disagreements": ["still disagree"], "revised_response": "my revised answer"}
+        custom_output_args={
+            "has_disagreements": True,
+            "disagreements": ["still disagree"],
+            "revised_response": "my revised answer",
+        }
     )
 
     with (
