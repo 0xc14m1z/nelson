@@ -246,3 +246,15 @@ export function useDeleteCustomModel() {
       queryClient.invalidateQueries({ queryKey: ["customModels"] }),
   });
 }
+
+export function useSessions() {
+  return useQuery<import("@/types/session").SessionSummary[]>({
+    queryKey: ["sessions"],
+    queryFn: async () => {
+      const resp = await apiFetch("/api/sessions");
+      if (!resp.ok) throw new Error("Failed to fetch sessions");
+      const data = await resp.json();
+      return data.sessions;
+    },
+  });
+}
