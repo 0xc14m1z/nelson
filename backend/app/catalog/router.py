@@ -43,10 +43,12 @@ async def list_models(
             provider_slug=m.provider.slug,
             slug=m.slug,
             display_name=m.display_name,
+            model_type=m.model_type,
             input_price_per_mtok=m.input_price_per_mtok,
             output_price_per_mtok=m.output_price_per_mtok,
             is_active=m.is_active,
             context_window=m.context_window,
+            tokens_per_second=m.tokens_per_second,
         )
         for m in models
     ]

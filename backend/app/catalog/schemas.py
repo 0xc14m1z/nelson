@@ -20,9 +20,11 @@ class ModelResponse(BaseModel):
     provider_slug: str
     slug: str
     display_name: str
+    model_type: str | None
     input_price_per_mtok: Decimal
     output_price_per_mtok: Decimal
     is_active: bool
     context_window: int
+    tokens_per_second: float | None
 
     model_config = {"from_attributes": True}
