@@ -35,5 +35,8 @@ class UserSettings(UUIDPrimaryKey, TimestampMixin, UpdatedAtMixin, Base):
         ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False
     )
     max_rounds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    summarizer_model_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("llm_models.id"), nullable=True
+    )
 
     user: Mapped["User"] = relationship(back_populates="settings")  # noqa: UP037

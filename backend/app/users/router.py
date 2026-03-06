@@ -51,7 +51,11 @@ async def update_user_settings(
 ):
     try:
         result = await update_settings(
-            current_user.id, body.max_rounds, body.default_model_ids, db
+            current_user.id,
+            body.max_rounds,
+            body.default_model_ids,
+            db,
+            summarizer_model_id=body.summarizer_model_id,
         )
         await db.commit()
         return result

@@ -76,6 +76,31 @@ async def test_update_settings_with_models():
 
 
 @pytest.mark.asyncio
+async def test_update_summarizer_model():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        token = await _get_auth_token(client, "users-summarizer@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Get a model ID from seed data
+        models_resp = await client.get("/api/models")
+        model_id = models_resp.json()[0]["id"]
+
+        resp = await client.put(
+            "/api/users/me/settings",
+            json={"summarizer_model_id": model_id},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["summarizer_model_id"] == model_id
+
+        # Verify it persists via GET
+        get_resp = await client.get("/api/users/me/settings", headers=headers)
+        assert get_resp.status_code == 200
+        assert get_resp.json()["summarizer_model_id"] == model_id
+
+
+@pytest.mark.asyncio
 async def test_update_settings_invalid_model_id():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
