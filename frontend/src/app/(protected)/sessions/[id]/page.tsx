@@ -96,10 +96,8 @@ function CompletedSessionView({
             <Paper
               p="sm"
               radius="md"
-              style={{
-                backgroundColor: "var(--mantine-color-dark-6)",
-                cursor: "pointer",
-              }}
+              withBorder
+              style={{ cursor: "pointer" }}
               onClick={() => toggleRound(roundNum)}
             >
               <Group gap="sm">
@@ -149,7 +147,6 @@ function CompletedSessionView({
                         display: "flex",
                         flexDirection: "column",
                         opacity: call.error ? 0.5 : 1,
-                        backgroundColor: "var(--mantine-color-dark-7)",
                       }}
                     >
                       <Text fw={600} size="sm" mb="sm">
@@ -261,8 +258,8 @@ export default function SessionPage() {
     return (
       <Stack gap="md">
         {/* Enquiry header */}
-        <Paper p="sm" radius="md" bg="blue.9">
-          <Text size="xs" c="blue.3" fw={600}>
+        <Paper p="sm" radius="md" withBorder>
+          <Text size="xs" c="dimmed" fw={600}>
             You
           </Text>
           <Text size="sm">{session.enquiry}</Text>
@@ -278,8 +275,8 @@ export default function SessionPage() {
     <Stack gap="md">
       {/* Enquiry header */}
       {session && (
-        <Paper p="sm" radius="md" bg="blue.9">
-          <Text size="xs" c="blue.3" fw={600}>
+        <Paper p="sm" radius="md" withBorder>
+          <Text size="xs" c="dimmed" fw={600}>
             You
           </Text>
           <Text size="sm">{session.enquiry}</Text>

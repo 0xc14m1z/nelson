@@ -25,13 +25,13 @@ export function StreamingColumn({ model, displayName, allModelsDone }: Streaming
     <Paper
       p="md"
       radius="md"
+      withBorder
       style={{
         flex: "1 1 0",
         minWidth: 350,
         display: "flex",
         flexDirection: "column",
         opacity: model.error ? 0.5 : 1,
-        backgroundColor: "var(--mantine-color-dark-7)",
       }}
     >
       {/* Header */}

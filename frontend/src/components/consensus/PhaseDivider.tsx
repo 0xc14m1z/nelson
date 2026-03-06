@@ -21,10 +21,8 @@ export function PhaseDivider({ phase, modelNames, onToggle }: PhaseDividerProps)
       p="sm"
       radius="md"
       my="md"
-      style={{
-        width: "100%",
-        backgroundColor: "var(--mantine-color-dark-6)",
-      }}
+      withBorder
+      style={{ width: "100%" }}
     >
       {/* Header bar */}
       <Group justify="space-between">
@@ -67,7 +65,7 @@ export function PhaseDivider({ phase, modelNames, onToggle }: PhaseDividerProps)
               p="xs"
               radius="sm"
               mb="xs"
-              style={{ backgroundColor: "var(--mantine-color-dark-7)" }}
+              withBorder
             >
               <Text size="sm" fw={500} mb={4}>
                 {modelNames.get(m.llm_model_id) ?? m.model_name}
@@ -113,7 +111,7 @@ export function PhaseDivider({ phase, modelNames, onToggle }: PhaseDividerProps)
               p="xs"
               radius="sm"
               mt="xs"
-              style={{ backgroundColor: "var(--mantine-color-dark-8)" }}
+              withBorder
             >
               <Text size="sm" fw={500} mb={4}>
                 Round Summary
