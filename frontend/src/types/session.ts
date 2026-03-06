@@ -26,6 +26,7 @@ export type SessionStatus =
   | "pending"
   | "responding"
   | "critiquing"
+  | "summarizing"
   | "consensus_reached"
   | "max_rounds_reached"
   | "failed";
@@ -35,7 +36,7 @@ export type SessionStatus =
 export interface ModelStartEvent {
   llm_model_id: string;
   round_number: number;
-  role: "responder" | "critic";
+  role: "responder" | "critic" | "summarizer";
 }
 
 export interface TokenDeltaEvent {

@@ -103,6 +103,7 @@ function groupByRound(models: Map<string, ModelStreamState>) {
 }
 
 function roundLabel(roundNumber: number, role: string) {
+  if (role === "summarizer") return "Final Consensus";
   if (role === "critic") return `Round ${roundNumber} — Critique`;
   return `Round ${roundNumber} — Initial Responses`;
 }

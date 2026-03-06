@@ -108,7 +108,11 @@ export function useConsensusStream({ sessionId, enabled = true }: UseConsensusSt
           return {
             ...prev,
             models: next,
-            status: data.role === "responder" ? "responding" : "critiquing",
+            status: data.role === "responder"
+              ? "responding"
+              : data.role === "summarizer"
+                ? "summarizing"
+                : "critiquing",
           };
         });
       } catch {
