@@ -27,7 +27,9 @@ def get_validation_config(provider_slug: str, base_url: str) -> ValidationConfig
     )
 
 
-async def validate_api_key(provider_slug: str, base_url: str, raw_key: str) -> tuple[bool, str | None]:
+async def validate_api_key(
+    provider_slug: str, base_url: str, raw_key: str
+) -> tuple[bool, str | None]:
     config = get_validation_config(provider_slug, base_url)
     url = config.url.replace("{key}", raw_key)
     headers = {k: v.replace("{key}", raw_key) for k, v in config.headers.items()}

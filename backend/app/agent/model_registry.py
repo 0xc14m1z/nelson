@@ -38,9 +38,8 @@ async def resolve_model(
     """
     # Ensure provider is loaded (check without triggering lazy load)
     if "provider" not in inspect(llm_model).dict:
-        result = await db.execute(
-            select(LLMModel).options(joinedload(LLMModel.provider)).where(LLMModel.id == llm_model.id)
-        )
+        query = select(LLMModel).options(joinedload(LLMModel.provider))
+        result = await db.execute(query.where(LLMModel.id == llm_model.id))
         llm_model = result.scalar_one()
 
     provider = llm_model.provider

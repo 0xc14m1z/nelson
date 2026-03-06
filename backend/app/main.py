@@ -2,8 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth.router import router as auth_router
-from app.config import settings
 from app.catalog.router import router as catalog_router
+from app.config import settings
 from app.keys.router import router as keys_router
 from app.users.router import router as users_router
 
