@@ -8,7 +8,13 @@ from pydantic_ai.models.test import TestModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent.consensus_agent import critic_agent, responder_agent, summarizer_agent
+from app.agent.consensus_agent import (
+    critic_agent,
+    disagreement_agent,
+    final_summarizer_agent,
+    responder_agent,
+    scorer_agent,
+)
 from app.consensus.service import ConsensusOrchestrator
 from app.database import engine
 from app.models import LLMCall, LLMModel, Provider, Session, User
@@ -74,7 +80,9 @@ async def test_responder_persists_confidence_and_key_points(db_session):
     with (
         responder_agent.override(model=TestModel()),
         critic_agent.override(model=TestModel()),
-        summarizer_agent.override(model=TestModel()),
+        scorer_agent.override(model=TestModel()),
+        disagreement_agent.override(model=TestModel()),
+        final_summarizer_agent.override(model=TestModel()),
     ):
         await orchestrator.run()
 
@@ -110,19 +118,20 @@ async def test_critic_persists_has_disagreements_and_disagreements(db_session):
 
     orchestrator = ConsensusOrchestrator(session.id, user.id)
 
-    # Use a critic that disagrees so we have clear values to check
-    disagreeing_critic = TestModel(
+    # Use a disagreement checker that always disagrees so we have clear values to check
+    disagreeing_checker = TestModel(
         custom_output_args={
             "has_disagreements": True,
             "disagreements": ["point A is wrong", "point B needs revision"],
-            "revised_response": "my revised answer",
         }
     )
 
     with (
         responder_agent.override(model=TestModel()),
-        critic_agent.override(model=disagreeing_critic),
-        summarizer_agent.override(model=TestModel()),
+        critic_agent.override(model=TestModel()),
+        scorer_agent.override(model=TestModel()),
+        disagreement_agent.override(model=disagreeing_checker),
+        final_summarizer_agent.override(model=TestModel()),
     ):
         await orchestrator.run()
 
@@ -163,7 +172,9 @@ async def test_critic_agreeing_persists_false_disagreements(db_session):
     with (
         responder_agent.override(model=TestModel()),
         critic_agent.override(model=TestModel()),
-        summarizer_agent.override(model=TestModel()),
+        scorer_agent.override(model=TestModel()),
+        disagreement_agent.override(model=TestModel()),
+        final_summarizer_agent.override(model=TestModel()),
     ):
         await orchestrator.run()
 

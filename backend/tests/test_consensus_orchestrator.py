@@ -7,7 +7,13 @@ from pydantic_ai.models.test import TestModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent.consensus_agent import critic_agent, responder_agent, summarizer_agent
+from app.agent.consensus_agent import (
+    critic_agent,
+    disagreement_agent,
+    final_summarizer_agent,
+    responder_agent,
+    scorer_agent,
+)
 from app.consensus.broadcast import StreamEvent, get_broadcast
 from app.consensus.service import ConsensusOrchestrator, cleanup_orphaned_sessions
 from app.database import engine
@@ -62,7 +68,9 @@ async def test_orchestrator_convergence(db_session):
     with (
         responder_agent.override(model=TestModel()),
         critic_agent.override(model=TestModel()),
-        summarizer_agent.override(model=TestModel()),
+        scorer_agent.override(model=TestModel()),
+        disagreement_agent.override(model=TestModel()),
+        final_summarizer_agent.override(model=TestModel()),
     ):
         await orchestrator.run()
 
@@ -109,19 +117,20 @@ async def test_orchestrator_max_rounds(db_session):
 
     orchestrator = ConsensusOrchestrator(session.id, user.id)
 
-    # Critic always returns has_disagreements=True so consensus is never reached
-    disagreeing_critic = TestModel(
+    # Disagreement agent always returns has_disagreements=True so consensus is never reached
+    disagreeing_checker = TestModel(
         custom_output_args={
             "has_disagreements": True,
             "disagreements": ["still disagree"],
-            "revised_response": "my revised answer",
         }
     )
 
     with (
         responder_agent.override(model=TestModel()),
-        critic_agent.override(model=disagreeing_critic),
-        summarizer_agent.override(model=TestModel()),
+        critic_agent.override(model=TestModel()),
+        scorer_agent.override(model=TestModel()),
+        disagreement_agent.override(model=disagreeing_checker),
+        final_summarizer_agent.override(model=TestModel()),
     ):
         await orchestrator.run()
 
@@ -159,7 +168,9 @@ async def test_orchestrator_records_totals(db_session):
     with (
         responder_agent.override(model=TestModel()),
         critic_agent.override(model=TestModel()),
-        summarizer_agent.override(model=TestModel()),
+        scorer_agent.override(model=TestModel()),
+        disagreement_agent.override(model=TestModel()),
+        final_summarizer_agent.override(model=TestModel()),
     ):
         await orchestrator.run()
 
@@ -235,7 +246,9 @@ async def test_orchestrator_emits_streaming_events(db_session):
     with (
         responder_agent.override(model=TestModel()),
         critic_agent.override(model=TestModel()),
-        summarizer_agent.override(model=TestModel()),
+        scorer_agent.override(model=TestModel()),
+        disagreement_agent.override(model=TestModel()),
+        final_summarizer_agent.override(model=TestModel()),
     ):
         collector_task = asyncio.create_task(_collect())
         await orchestrator.run()

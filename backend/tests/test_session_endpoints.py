@@ -4,7 +4,13 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from pydantic_ai.models.test import TestModel
 
-from app.agent.consensus_agent import critic_agent, responder_agent, summarizer_agent
+from app.agent.consensus_agent import (
+    critic_agent,
+    disagreement_agent,
+    final_summarizer_agent,
+    responder_agent,
+    scorer_agent,
+)
 from app.main import app
 from tests.conftest import extract_token_from_mailpit
 
@@ -33,7 +39,9 @@ async def test_create_session():
         with (
             responder_agent.override(model=TestModel()),
             critic_agent.override(model=TestModel()),
-            summarizer_agent.override(model=TestModel()),
+            scorer_agent.override(model=TestModel()),
+            disagreement_agent.override(model=TestModel()),
+            final_summarizer_agent.override(model=TestModel()),
         ):
             resp = await client.post(
                 "/api/sessions",
@@ -128,7 +136,9 @@ async def test_get_session_detail():
         with (
             responder_agent.override(model=TestModel()),
             critic_agent.override(model=TestModel()),
-            summarizer_agent.override(model=TestModel()),
+            scorer_agent.override(model=TestModel()),
+            disagreement_agent.override(model=TestModel()),
+            final_summarizer_agent.override(model=TestModel()),
         ):
             create_resp = await client.post(
                 "/api/sessions",
@@ -161,7 +171,9 @@ async def test_delete_session():
         with (
             responder_agent.override(model=TestModel()),
             critic_agent.override(model=TestModel()),
-            summarizer_agent.override(model=TestModel()),
+            scorer_agent.override(model=TestModel()),
+            disagreement_agent.override(model=TestModel()),
+            final_summarizer_agent.override(model=TestModel()),
         ):
             create_resp = await client.post(
                 "/api/sessions",
@@ -200,36 +212,61 @@ async def test_delete_session_not_found():
 
 @pytest.mark.asyncio
 async def test_get_session_detail_includes_structured_fields():
-    """Verify that GET /api/sessions/{id} returns structured fields in llm_calls."""
-    import asyncio
+    """Verify that GET /api/sessions/{id} returns structured fields in llm_calls.
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        token = await _get_auth_token(client, "sess-structured@example.com")
-        headers = {"Authorization": f"Bearer {token}"}
-        model_ids = await _get_model_ids(client)
+    We run the orchestrator directly (not via background task) to avoid
+    context-variable propagation issues with TestModel overrides in ASGI tests.
+    Then we verify the HTTP GET endpoint returns the structured data.
+    """
+    from sqlalchemy.ext.asyncio import AsyncSession as AS
+
+    from app.consensus.service import ConsensusOrchestrator
+    from app.database import engine
+    from app.models import LLMModel, Provider, Session, User
+
+    async with AS(engine, expire_on_commit=False) as db:
+        tag = uuid.uuid4().hex[:8]
+        user = User(email=f"struct-ep-{tag}@example.com")
+        db.add(user)
+        await db.flush()
+
+        provider = Provider(
+            slug=f"test-prov-{tag}", display_name="Test", base_url="https://test.com"
+        )
+        db.add(provider)
+        await db.flush()
+
+        m1 = LLMModel(provider_id=provider.id, slug=f"model-a-{tag}", display_name="A")
+        m2 = LLMModel(provider_id=provider.id, slug=f"model-b-{tag}", display_name="B")
+        db.add_all([m1, m2])
+        await db.flush()
+
+        session = Session(user_id=user.id, enquiry="Structured fields test")
+        session.models = [m1, m2]
+        db.add(session)
+        await db.commit()
+        await db.refresh(session)
+
+        orchestrator = ConsensusOrchestrator(session.id, user.id)
 
         with (
             responder_agent.override(model=TestModel()),
             critic_agent.override(model=TestModel()),
-            summarizer_agent.override(model=TestModel()),
+            scorer_agent.override(model=TestModel()),
+            disagreement_agent.override(model=TestModel()),
+            final_summarizer_agent.override(model=TestModel()),
         ):
-            create_resp = await client.post(
-                "/api/sessions",
-                json={
-                    "enquiry": "Structured fields test question",
-                    "model_ids": model_ids,
-                },
-                headers=headers,
-            )
-            assert create_resp.status_code == 201
-            session_id = create_resp.json()["id"]
+            await orchestrator.run()
 
-            # Wait for background orchestrator to finish
-            await asyncio.sleep(3)
+    # Now verify through the HTTP endpoint
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        tag2 = uuid.uuid4().hex[:8]
+        token = await _get_auth_token(client, f"struct-ep-{tag}@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
 
         resp = await client.get(
-            f"/api/sessions/{session_id}", headers=headers
+            f"/api/sessions/{session.id}", headers=headers
         )
         assert resp.status_code == 200
         data = resp.json()

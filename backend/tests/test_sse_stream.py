@@ -5,7 +5,13 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from pydantic_ai.models.test import TestModel
 
-from app.agent.consensus_agent import critic_agent, responder_agent, summarizer_agent
+from app.agent.consensus_agent import (
+    critic_agent,
+    disagreement_agent,
+    final_summarizer_agent,
+    responder_agent,
+    scorer_agent,
+)
 from app.main import app
 from tests.conftest import extract_token_from_mailpit
 
@@ -35,7 +41,9 @@ async def test_sse_replay_completed_session():
         with (
             responder_agent.override(model=TestModel()),
             critic_agent.override(model=TestModel()),
-            summarizer_agent.override(model=TestModel()),
+            scorer_agent.override(model=TestModel()),
+            disagreement_agent.override(model=TestModel()),
+            final_summarizer_agent.override(model=TestModel()),
         ):
             create_resp = await client.post(
                 "/api/sessions",
@@ -97,7 +105,9 @@ async def test_sse_stream_other_user_session():
         with (
             responder_agent.override(model=TestModel()),
             critic_agent.override(model=TestModel()),
-            summarizer_agent.override(model=TestModel()),
+            scorer_agent.override(model=TestModel()),
+            disagreement_agent.override(model=TestModel()),
+            final_summarizer_agent.override(model=TestModel()),
         ):
             create_resp = await client.post(
                 "/api/sessions",
