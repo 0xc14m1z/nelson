@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
+  Alert,
   Badge,
   Button,
   Checkbox,
@@ -37,14 +38,20 @@ import {
 } from "../../../lib/hooks";
 import type { CustomModel, OpenRouterModel } from "../../../lib/hooks";
 
+const PROVIDER_ORDER = ["anthropic", "openai", "google", "mistral", "xai", "openrouter"];
+
 /* ─── API Keys Tab ─── */
 
 function ApiKeysTab() {
-  const { data: providers = [], isLoading: providersLoading } = useProviders();
+  const { data: rawProviders = [], isLoading: providersLoading } = useProviders();
   const { data: apiKeys = [], isLoading: keysLoading } = useApiKeys();
   const storeKey = useStoreKey();
   const deleteKey = useDeleteKey();
   const validateKey = useValidateKey();
+
+  const providers = [...rawProviders].sort(
+    (a, b) => (PROVIDER_ORDER.indexOf(a.slug) ?? 99) - (PROVIDER_ORDER.indexOf(b.slug) ?? 99),
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<{
@@ -236,11 +243,27 @@ function ApiKeysTab() {
   );
 }
 
-/* ─── Model Metadata ─── */
+/* ─── Model Label (inline name + metadata) ─── */
 
-function ModelMetadata({
+function modelTypeBadgeColor(modelType: string): string {
+  switch (modelType) {
+    case "reasoning":
+      return "violet";
+    case "hybrid":
+      return "blue";
+    case "code":
+      return "green";
+    default:
+      return "gray";
+  }
+}
+
+function ModelLabel({
+  name,
   model,
+  extra,
 }: {
+  name: string;
   model: {
     model_type?: string | null;
     input_price_per_mtok: string;
@@ -248,32 +271,26 @@ function ModelMetadata({
     context_window: number;
     tokens_per_second?: number | null;
   };
+  extra?: React.ReactNode;
 }) {
   return (
-    <Group gap="xs" mt={4}>
+    <Group gap="xs" wrap="wrap">
+      <Text size="sm" fw={500}>
+        {name}
+      </Text>
+      {extra}
       {model.model_type && (
-        <Badge
-          size="xs"
-          variant="light"
-          color={
-            model.model_type === "reasoning"
-              ? "violet"
-              : model.model_type === "hybrid"
-                ? "blue"
-                : model.model_type === "code"
-                  ? "green"
-                  : "gray"
-          }
-        >
+        <Badge size="xs" variant="light" color={modelTypeBadgeColor(model.model_type)}>
           {model.model_type}
         </Badge>
       )}
       <Text size="xs" c="dimmed">
-        ${model.input_price_per_mtok}/${model.output_price_per_mtok} per M
-        tokens
+        ${parseFloat(model.input_price_per_mtok).toFixed(2)}/${parseFloat(model.output_price_per_mtok).toFixed(2)} per M tokens
       </Text>
       <Text size="xs" c="dimmed">
-        {(model.context_window / 1000).toFixed(0)}K ctx
+        {model.context_window >= 1000000
+          ? `${(model.context_window / 1000000).toFixed(model.context_window % 1000000 === 0 ? 0 : 1)}M context`
+          : `${(model.context_window / 1000).toFixed(0)}K context`}
       </Text>
       {model.tokens_per_second && (
         <Text size="xs" c="dimmed">
@@ -290,39 +307,32 @@ function AddFromOpenRouterModal({
   opened,
   onClose,
   hasOpenRouterKey,
-  customModelSlugs,
+  excludedSlugs,
 }: {
   opened: boolean;
   onClose: () => void;
   hasOpenRouterKey: boolean;
-  customModelSlugs: Set<string>;
+  excludedSlugs: Set<string>;
 }) {
   const [searchInput, setSearchInput] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addCustomModel = useAddCustomModel();
 
-  useEffect(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      setDebouncedSearch(searchInput);
-    }, 300);
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [searchInput]);
+  const {
+    data: allModels = [],
+    isLoading,
+  } = useOpenRouterModels(opened && hasOpenRouterKey);
+
+  const filtered = searchInput.trim()
+    ? allModels.filter((m) => {
+        const term = searchInput.toLowerCase();
+        return m.display_name.toLowerCase().includes(term) || m.slug.toLowerCase().includes(term);
+      })
+    : allModels;
 
   function handleClose() {
     setSearchInput("");
-    setDebouncedSearch("");
     onClose();
   }
-
-  const {
-    data: results = [],
-    isLoading,
-    isFetching,
-  } = useOpenRouterModels(debouncedSearch);
 
   async function handleAdd(model: OpenRouterModel) {
     try {
@@ -373,31 +383,28 @@ function AddFromOpenRouterModal({
     >
       <Stack>
         <TextInput
-          placeholder="Search models (min 2 characters)..."
+          placeholder="Search models..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.currentTarget.value)}
         />
 
-        {(isLoading || isFetching) && debouncedSearch.length >= 2 && (
+        {isLoading && (
           <Group justify="center" py="md">
             <Loader size="sm" />
           </Group>
         )}
 
-        {debouncedSearch.length >= 2 &&
-          !isLoading &&
-          !isFetching &&
-          results.length === 0 && (
-            <Text c="dimmed" ta="center" py="md">
-              No models found.
-            </Text>
-          )}
+        {!isLoading && filtered.length === 0 && (
+          <Text c="dimmed" ta="center" py="md">
+            No models found.
+          </Text>
+        )}
 
-        {results.length > 0 && (
+        {filtered.length > 0 && (
           <ScrollArea.Autosize mah={400}>
             <Stack gap="xs">
-              {results.map((model) => {
-                const alreadyAdded = customModelSlugs.has(model.slug);
+              {filtered.map((model) => {
+                const alreadyAdded = excludedSlugs.has(model.slug);
                 return (
                   <Paper key={model.slug} p="sm" radius="sm" withBorder>
                     <Group justify="space-between" wrap="wrap">
@@ -426,13 +433,15 @@ function AddFromOpenRouterModal({
                           {model.input_price_per_mtok &&
                             model.output_price_per_mtok && (
                               <Text size="xs" c="dimmed">
-                                ${model.input_price_per_mtok}/$
-                                {model.output_price_per_mtok} per M tokens
+                                ${parseFloat(model.input_price_per_mtok).toFixed(2)}/$
+                                {parseFloat(model.output_price_per_mtok).toFixed(2)} per M tokens
                               </Text>
                             )}
                           {model.context_window && (
                             <Text size="xs" c="dimmed">
-                              {(model.context_window / 1000).toFixed(0)}K ctx
+                              {model.context_window >= 1000000
+                                ? `${(model.context_window / 1000000).toFixed(model.context_window % 1000000 === 0 ? 0 : 1)}M context`
+                                : `${(model.context_window / 1000).toFixed(0)}K context`}
                             </Text>
                           )}
                         </Group>
@@ -460,6 +469,7 @@ function AddFromOpenRouterModal({
 /* ─── Default Models Tab ─── */
 
 function DefaultModelsTab() {
+  const { data: providers = [] } = useProviders();
   const { data: models = [], isLoading: modelsLoading } = useModels();
   const { data: apiKeys = [], isLoading: keysLoading } = useApiKeys();
   const { data: settings, isLoading: settingsLoading } = useUserSettings();
@@ -487,15 +497,27 @@ function DefaultModelsTab() {
     (m) => keyProviderIds.has(m.provider_id) || hasOpenRouter,
   );
 
-  // Group by provider
+  // Group by provider, sorted in preferred order
+  const providerOrder = PROVIDER_ORDER;
   const grouped = new Map<string, typeof availableModels>();
+  for (const slug of providerOrder) {
+    const providerModels = availableModels.filter((m) => m.provider_slug === slug);
+    if (providerModels.length > 0) grouped.set(slug, providerModels);
+  }
+  // Append any providers not in the list
   for (const model of availableModels) {
-    const key = model.provider_slug;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(model);
+    if (!grouped.has(model.provider_slug)) {
+      grouped.set(model.provider_slug, []);
+    }
+    if (!providerOrder.includes(model.provider_slug)) {
+      grouped.get(model.provider_slug)!.push(model);
+    }
   }
 
-  const customModelSlugs = new Set(customModels.map((m) => m.slug));
+  const excludedSlugs = new Set([
+    ...models.map((m) => m.slug),
+    ...customModels.map((m) => m.slug),
+  ]);
 
   function toggleModelId(modelId: string) {
     const current = editedModelIds ?? settings?.default_model_ids ?? [];
@@ -557,22 +579,25 @@ function DefaultModelsTab() {
 
   return (
     <Stack gap="lg">
+      <Alert variant="light" color="blue" title="How it works">
+        Select the models that will be used by default for every new inquiry.
+        You can always override these on a per-inquiry basis.
+      </Alert>
+
       {/* Curated models grouped by provider */}
       {Array.from(grouped.entries()).map(([providerSlug, providerModels]) => (
         <Paper key={providerSlug} p="md" radius="md" withBorder>
-          <Text fw={500} mb="sm" tt="capitalize">
-            {providerModels[0]?.provider_slug}
+          <Text fw={500} mb="sm">
+            {providers.find((p) => p.slug === providerSlug)?.display_name ?? providerSlug}
           </Text>
           <Stack gap="xs">
             {providerModels.map((model) => (
-              <div key={model.id}>
-                <Checkbox
-                  checked={selectedModelIds.includes(model.id)}
-                  onChange={() => toggleModelId(model.id)}
-                  label={model.display_name}
-                />
-                <ModelMetadata model={model} />
-              </div>
+              <Checkbox
+                key={model.id}
+                checked={selectedModelIds.includes(model.id)}
+                onChange={() => toggleModelId(model.id)}
+                label={<ModelLabel name={model.display_name} model={model} />}
+              />
             ))}
           </Stack>
         </Paper>
@@ -586,19 +611,22 @@ function DefaultModelsTab() {
             <Stack gap="xs">
               {customModels.map((model) => (
                 <Group key={model.id} justify="space-between" wrap="wrap">
-                  <Stack gap={0} style={{ flex: 1 }}>
-                    <Group gap="xs">
-                      <Checkbox
-                        checked={selectedModelIds.includes(model.id)}
-                        onChange={() => toggleModelId(model.id)}
-                        label={model.display_name}
+                  <Checkbox
+                    checked={selectedModelIds.includes(model.id)}
+                    onChange={() => toggleModelId(model.id)}
+                    label={
+                      <ModelLabel
+                        name={model.display_name}
+                        model={model}
+                        extra={
+                          <Badge size="xs" variant="outline" color="teal">
+                            Custom
+                          </Badge>
+                        }
                       />
-                      <Badge size="xs" variant="outline" color="teal">
-                        Custom
-                      </Badge>
-                    </Group>
-                    <ModelMetadata model={model} />
-                  </Stack>
+                    }
+                    style={{ flex: 1 }}
+                  />
                   <Button
                     size="xs"
                     variant="subtle"
@@ -615,23 +643,23 @@ function DefaultModelsTab() {
         </>
       )}
 
-      {/* Add from OpenRouter button */}
-      <Button
-        variant="light"
-        onClick={() => setOpenRouterModalOpen(true)}
-      >
-        Add from OpenRouter
-      </Button>
-
-      <Button onClick={handleSave} loading={updateSettings.isPending}>
-        Save Default Models
-      </Button>
+      <Group>
+        <Button onClick={handleSave} loading={updateSettings.isPending}>
+          Save
+        </Button>
+        <Button
+          variant="light"
+          onClick={() => setOpenRouterModalOpen(true)}
+        >
+          Add from OpenRouter
+        </Button>
+      </Group>
 
       <AddFromOpenRouterModal
         opened={openRouterModalOpen}
         onClose={() => setOpenRouterModalOpen(false)}
         hasOpenRouterKey={hasOpenRouter}
-        customModelSlugs={customModelSlugs}
+        excludedSlugs={excludedSlugs}
       />
     </Stack>
   );

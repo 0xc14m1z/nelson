@@ -26,6 +26,7 @@ PROVIDER_IDS = {
     "google": uuid.UUID("10000000-0000-0000-0000-000000000003"),
     "mistral": uuid.UUID("10000000-0000-0000-0000-000000000004"),
     "openrouter": uuid.UUID("10000000-0000-0000-0000-000000000005"),
+    "xai": uuid.UUID("10000000-0000-0000-0000-000000000006"),
 }
 
 MODEL_IDS = {
@@ -42,9 +43,42 @@ MODEL_IDS = {
     "mistral-medium-3": uuid.UUID("20000000-0000-0000-0000-000000000111"),
     "deepseek/deepseek-v3.2": uuid.UUID("20000000-0000-0000-0000-000000000112"),
     "qwen/qwen3-coder": uuid.UUID("20000000-0000-0000-0000-000000000113"),
+    "grok-3": uuid.UUID("20000000-0000-0000-0000-000000000114"),
 }
 
 MODELS = [
+    # --- Anthropic ---
+    {
+        "id": MODEL_IDS["claude-opus-4-6"],
+        "provider_id": PROVIDER_IDS["anthropic"],
+        "slug": "claude-opus-4-6",
+        "display_name": "Claude Opus 4.6",
+        "model_type": "hybrid",
+        "input_price_per_mtok": 5.00,
+        "output_price_per_mtok": 25.00,
+        "context_window": 1000000,
+    },
+    {
+        "id": MODEL_IDS["claude-sonnet-4-6"],
+        "provider_id": PROVIDER_IDS["anthropic"],
+        "slug": "claude-sonnet-4-6",
+        "display_name": "Claude Sonnet 4.6",
+        "model_type": "hybrid",
+        "input_price_per_mtok": 3.00,
+        "output_price_per_mtok": 15.00,
+        "context_window": 1000000,
+    },
+    {
+        "id": MODEL_IDS["claude-haiku-4-5"],
+        "provider_id": PROVIDER_IDS["anthropic"],
+        "slug": "claude-haiku-4-5",
+        "display_name": "Claude Haiku 4.5",
+        "model_type": "chat",
+        "input_price_per_mtok": 0.25,
+        "output_price_per_mtok": 1.25,
+        "context_window": 200000,
+    },
+    # --- OpenAI ---
     {
         "id": MODEL_IDS["gpt-5"],
         "provider_id": PROVIDER_IDS["openai"],
@@ -85,36 +119,7 @@ MODELS = [
         "output_price_per_mtok": 0,
         "context_window": 200000,
     },
-    {
-        "id": MODEL_IDS["claude-opus-4-6"],
-        "provider_id": PROVIDER_IDS["anthropic"],
-        "slug": "claude-opus-4-6",
-        "display_name": "Claude Opus 4.6",
-        "model_type": "hybrid",
-        "input_price_per_mtok": 5.00,
-        "output_price_per_mtok": 25.00,
-        "context_window": 1000000,
-    },
-    {
-        "id": MODEL_IDS["claude-sonnet-4-6"],
-        "provider_id": PROVIDER_IDS["anthropic"],
-        "slug": "claude-sonnet-4-6",
-        "display_name": "Claude Sonnet 4.6",
-        "model_type": "hybrid",
-        "input_price_per_mtok": 3.00,
-        "output_price_per_mtok": 15.00,
-        "context_window": 1000000,
-    },
-    {
-        "id": MODEL_IDS["claude-haiku-4-5"],
-        "provider_id": PROVIDER_IDS["anthropic"],
-        "slug": "claude-haiku-4-5",
-        "display_name": "Claude Haiku 4.5",
-        "model_type": "chat",
-        "input_price_per_mtok": 0.25,
-        "output_price_per_mtok": 1.25,
-        "context_window": 200000,
-    },
+    # --- Google ---
     {
         "id": MODEL_IDS["gemini-3.1-pro"],
         "provider_id": PROVIDER_IDS["google"],
@@ -135,6 +140,7 @@ MODELS = [
         "output_price_per_mtok": 1.50,
         "context_window": 1000000,
     },
+    # --- Mistral ---
     {
         "id": MODEL_IDS["mistral-large-3"],
         "provider_id": PROVIDER_IDS["mistral"],
@@ -155,6 +161,18 @@ MODELS = [
         "output_price_per_mtok": 2.00,
         "context_window": 128000,
     },
+    # --- xAI ---
+    {
+        "id": MODEL_IDS["grok-3"],
+        "provider_id": PROVIDER_IDS["xai"],
+        "slug": "grok-3",
+        "display_name": "Grok 3",
+        "model_type": "chat",
+        "input_price_per_mtok": 3.00,
+        "output_price_per_mtok": 15.00,
+        "context_window": 131072,
+    },
+    # --- OpenRouter ---
     {
         "id": MODEL_IDS["deepseek/deepseek-v3.2"],
         "provider_id": PROVIDER_IDS["openrouter"],
@@ -217,6 +235,28 @@ def upgrade() -> None:
     op.add_column("llm_models", sa.Column("model_type", sa.String(length=50), nullable=True))
     op.add_column("llm_models", sa.Column("tokens_per_second", sa.Float(), nullable=True))
 
+    # --- Seed data: add xAI provider ---
+    providers_table = sa.table(
+        "providers",
+        sa.column("id", sa.Uuid),
+        sa.column("slug", sa.String),
+        sa.column("display_name", sa.String),
+        sa.column("base_url", sa.String),
+        sa.column("is_active", sa.Boolean),
+    )
+    op.bulk_insert(
+        providers_table,
+        [
+            {
+                "id": PROVIDER_IDS["xai"],
+                "slug": "xai",
+                "display_name": "xAI",
+                "base_url": "https://api.x.ai/v1",
+                "is_active": True,
+            },
+        ],
+    )
+
     # --- Seed data: replace old models with 2026 frontier models ---
     op.execute("DELETE FROM user_default_models")
     op.execute("DELETE FROM llm_models")
@@ -259,6 +299,9 @@ def downgrade() -> None:
     # --- DDL: drop new columns ---
     op.drop_column("llm_models", "tokens_per_second")
     op.drop_column("llm_models", "model_type")
+
+    # --- Remove xAI provider ---
+    op.execute(f"DELETE FROM providers WHERE id = '{PROVIDER_IDS['xai']}'")
 
     # --- DDL: drop new tables ---
     op.drop_index(op.f("ix_user_custom_models_user_id"), table_name="user_custom_models")

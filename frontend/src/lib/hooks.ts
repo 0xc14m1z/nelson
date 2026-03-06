@@ -190,18 +190,16 @@ export function useCustomModels() {
   });
 }
 
-export function useOpenRouterModels(search: string) {
+export function useOpenRouterModels(enabled: boolean) {
   return useQuery<OpenRouterModel[]>({
-    queryKey: ["openrouterModels", search],
+    queryKey: ["openrouterModels"],
     queryFn: async () => {
-      const url = search
-        ? `/api/openrouter/models?search=${encodeURIComponent(search)}`
-        : "/api/openrouter/models";
-      const resp = await apiFetch(url);
+      const resp = await apiFetch("/api/openrouter/models");
       if (!resp.ok) throw new Error("Failed to fetch OpenRouter models");
       return resp.json();
     },
-    enabled: search.length >= 2,
+    enabled,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

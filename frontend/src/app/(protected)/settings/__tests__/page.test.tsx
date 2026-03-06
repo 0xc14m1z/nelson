@@ -13,6 +13,11 @@ const mockApiKeys = [
     provider_display_name: "OpenAI", masked_key: "****2345",
     is_valid: true, validated_at: "2026-01-01T00:00:00Z", created_at: "2026-01-01T00:00:00Z",
   },
+  {
+    id: "k2", provider_id: "2", provider_slug: "anthropic",
+    provider_display_name: "Anthropic", masked_key: "****6789",
+    is_valid: true, validated_at: "2026-01-01T00:00:00Z", created_at: "2026-01-01T00:00:00Z",
+  },
 ];
 const mockModels = [
   {
@@ -20,6 +25,12 @@ const mockModels = [
     display_name: "GPT-5", model_type: "chat", tokens_per_second: null,
     input_price_per_mtok: "1.25", output_price_per_mtok: "10.00",
     context_window: 400000, is_active: true,
+  },
+  {
+    id: "m2", provider_id: "2", provider_slug: "anthropic", slug: "claude-opus-4-6",
+    display_name: "Claude Opus 4.6", model_type: "hybrid", tokens_per_second: null,
+    input_price_per_mtok: "5.00", output_price_per_mtok: "25.00",
+    context_window: 1000000, is_active: true,
   },
 ];
 const mockSettings = { max_rounds: null, default_model_ids: [] as string[] };
@@ -36,6 +47,8 @@ vi.mock("@mantine/core", () => {
     { Group: wrap() }
   );
   return {
+    Alert: (props: Record<string, unknown>) =>
+      R.createElement("div", { role: "alert" }, props.title && R.createElement("strong", null, props.title), props.children),
     Badge: wrap(), Button: wrap(), Checkbox, Container: wrap(), Divider: wrap(),
     Group: wrap(), Loader: wrap(), MantineProvider: wrap(),
     Modal: (props: Record<string, unknown>) =>
@@ -63,7 +76,7 @@ vi.mock("../../../../lib/hooks", () => ({
   useCustomModels: () => ({ data: [], isLoading: false }),
   useAddCustomModel: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteCustomModel: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useOpenRouterModels: () => ({ data: [], isLoading: false, isFetching: false }),
+  useOpenRouterModels: () => ({ data: [], isLoading: false }),
 }));
 vi.mock("../../../../lib/auth-context", () => ({
   useAuth: () => ({
@@ -103,7 +116,37 @@ describe("Settings Page", () => {
 
   it("shows provider names", () => {
     renderPage();
-    expect(screen.getByText("OpenAI")).toBeInTheDocument();
-    expect(screen.getByText("Anthropic")).toBeInTheDocument();
+    expect(screen.getAllByText("OpenAI").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Anthropic").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows model metadata inline with prices rounded to 2 decimals", () => {
+    renderPage();
+    // Price formatting: $1.25/$10.00
+    expect(screen.getByText(/\$1\.25\/\$10\.00 per M tokens/)).toBeInTheDocument();
+  });
+
+  it("shows context window as K for sub-million", () => {
+    renderPage();
+    expect(screen.getByText("400K context")).toBeInTheDocument();
+  });
+
+  it("shows context window as M for 1 million+", () => {
+    renderPage();
+    expect(screen.getByText("1M context")).toBeInTheDocument();
+  });
+
+  it("shows model type badge", () => {
+    renderPage();
+    expect(screen.getByText("chat")).toBeInTheDocument();
+    expect(screen.getByText("hybrid")).toBeInTheDocument();
+  });
+
+  it("orders providers: Anthropic before OpenAI in default models", () => {
+    renderPage();
+    const allText = document.body.textContent || "";
+    const anthropicIdx = allText.indexOf("Claude Opus 4.6");
+    const openaiIdx = allText.indexOf("GPT-5");
+    expect(anthropicIdx).toBeLessThan(openaiIdx);
   });
 });

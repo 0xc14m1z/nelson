@@ -23,6 +23,49 @@ async def get_openrouter_key(user_id: uuid.UUID, db: AsyncSession) -> str | None
     return await get_decrypted_key(user_id, provider.id, db)
 
 
+_CODE_HINTS = {"coder", "codestral", "code"}
+_DIFFUSION_HINTS = {"diffusion", "mercury"}
+
+
+def _classify_model_type(
+    slug: str,
+    name: str,
+    supported_params: list[str] | None,
+) -> str | None:
+    """Classify a model using OpenRouter's supported_parameters.
+
+    Logic:
+    - 'reasoning' in params + no 'temperature' → pure reasoning model
+    - 'reasoning' in params + 'temperature' → hybrid (can toggle reasoning)
+    - code/diffusion hints in slug/name override the above
+    - everything else with params → chat
+    """
+    lower_slug = slug.lower()
+    lower_name = name.lower()
+    combined = f"{lower_slug} {lower_name}"
+
+    # Check for diffusion models first (name-based)
+    if any(h in combined for h in _DIFFUSION_HINTS):
+        return "diffusion"
+
+    # Check for code models (name-based)
+    if any(h in combined for h in _CODE_HINTS):
+        return "code"
+
+    if not supported_params:
+        return None
+
+    has_reasoning = "reasoning" in supported_params
+    has_temperature = "temperature" in supported_params
+
+    if has_reasoning and not has_temperature:
+        return "reasoning"
+    if has_reasoning and has_temperature:
+        return "hybrid"
+
+    return "chat"
+
+
 async def search_openrouter_models(
     api_key: str,
     search: str | None = None,
@@ -59,8 +102,8 @@ async def search_openrouter_models(
         )
 
         context_length = m.get("context_length")
-        arch = m.get("architecture", {})
-        model_type = arch.get("modality") if arch else None
+        supported_params = m.get("supported_parameters", [])
+        model_type = _classify_model_type(model_id, name, supported_params)
 
         models.append(
             OpenRouterModelResponse(
