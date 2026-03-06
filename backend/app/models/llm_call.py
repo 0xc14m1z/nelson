@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -21,7 +22,7 @@ class LLMCall(UUIDPrimaryKey, TimestampMixin, Base):
     response: Mapped[str] = mapped_column(Text, default="")
     input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    cost: Mapped[float] = mapped_column(Numeric(12, 6), default=0)
+    cost: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=0)
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 

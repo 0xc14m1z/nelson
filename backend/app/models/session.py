@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     Column,
@@ -38,7 +39,7 @@ class Session(UUIDPrimaryKey, TimestampMixin, Base):
     )
     total_input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     total_output_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    total_cost: Mapped[float] = mapped_column(Numeric(12, 6), default=0)
+    total_cost: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=0)
     total_duration_ms: Mapped[int] = mapped_column(Integer, default=0)
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
