@@ -3,17 +3,22 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ActionIcon,
   Box,
   Button,
-  Checkbox,
   Group,
   NumberInput,
+  Pill,
+  Popover,
+  ScrollArea,
   Stack,
   Switch,
   Text,
   Textarea,
   Title,
+  UnstyledButton,
 } from "@mantine/core";
+import { IconCheck, IconPlus } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
@@ -50,6 +55,12 @@ export default function NewSessionPage() {
 
     setInitialized(true);
   }, [initialized, settings, models]);
+
+  const toggleModel = (id: string) => {
+    setSelectedModelIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   // Group models by provider
   const grouped = models.reduce<Record<string, Model[]>>((acc, m) => {
@@ -103,19 +114,60 @@ export default function NewSessionPage() {
       />
 
       <Box>
-        <Text fw={500} mb="xs">Select models (minimum 2)</Text>
-        {Object.entries(grouped).map(([provider, providerModels]) => (
-          <Box key={provider} mb="sm">
-            <Text size="sm" c="dimmed" tt="uppercase" mb={4}>{provider}</Text>
-            <Checkbox.Group value={selectedModelIds} onChange={setSelectedModelIds}>
-              <Stack gap={4}>
-                {providerModels.map((m) => (
-                  <Checkbox key={m.id} value={m.id} label={m.display_name} />
+        <Text fw={500} mb="xs">Models</Text>
+        <Group gap="xs">
+          {selectedModelIds
+            .map((id) => models.find((m) => m.id === id))
+            .filter(Boolean)
+            .map((m) => (
+              <Pill
+                key={m!.id}
+                withRemoveButton
+                onRemove={() => toggleModel(m!.id)}
+                removeButtonProps={{
+                  disabled: selectedModelIds.length <= 2,
+                }}
+              >
+                {m!.display_name}
+              </Pill>
+            ))}
+          <Popover width={300} position="bottom-start" shadow="md">
+            <Popover.Target>
+              <ActionIcon variant="subtle" size="sm">
+                <IconPlus size={16} />
+              </ActionIcon>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <ScrollArea.Autosize mah={300}>
+                {Object.entries(grouped).map(([provider, providerModels]) => (
+                  <Box key={provider} mb="xs">
+                    <Text size="xs" c="dimmed" tt="uppercase" fw={600} mb={4}>
+                      {provider}
+                    </Text>
+                    {providerModels.map((m) => {
+                      const selected = selectedModelIds.includes(m.id);
+                      return (
+                        <UnstyledButton
+                          key={m.id}
+                          onClick={() => toggleModel(m.id)}
+                          w="100%"
+                          py={4}
+                          px="xs"
+                          style={{ borderRadius: 4 }}
+                        >
+                          <Group justify="space-between">
+                            <Text size="sm">{m.display_name}</Text>
+                            {selected && <IconCheck size={16} color="var(--mantine-color-blue-6)" />}
+                          </Group>
+                        </UnstyledButton>
+                      );
+                    })}
+                  </Box>
                 ))}
-              </Stack>
-            </Checkbox.Group>
-          </Box>
-        ))}
+              </ScrollArea.Autosize>
+            </Popover.Dropdown>
+          </Popover>
+        </Group>
       </Box>
 
       <Group>
