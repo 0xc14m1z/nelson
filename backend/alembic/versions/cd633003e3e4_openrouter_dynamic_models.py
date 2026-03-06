@@ -1,7 +1,7 @@
 """openrouter dynamic models
 
 Revision ID: cd633003e3e4
-Revises: 425cd5ccf52a
+Revises: 0ae6b35ef59c
 Create Date: 2026-03-06 03:12:41.804731
 
 """
@@ -14,7 +14,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "cd633003e3e4"
-down_revision: str | Sequence[str] | None = "425cd5ccf52a"
+down_revision: str | Sequence[str] | None = "0ae6b35ef59c"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -218,6 +218,7 @@ def upgrade() -> None:
     op.add_column("llm_models", sa.Column("tokens_per_second", sa.Float(), nullable=True))
 
     # --- Seed data: replace old models with 2026 frontier models ---
+    op.execute("DELETE FROM user_default_models")
     op.execute("DELETE FROM llm_models")
 
     models_table = sa.table(
