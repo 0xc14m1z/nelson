@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Container,
   Title,
@@ -20,9 +21,18 @@ export default function DashboardPage() {
         <Stack>
           <Group justify="space-between">
             <Title order={2}>Dashboard</Title>
-            <Button variant="subtle" onClick={logout}>
-              Sign out
-            </Button>
+            <Group gap="xs">
+              <Button
+                component={Link}
+                href="/settings"
+                variant="light"
+              >
+                Settings
+              </Button>
+              <Button variant="subtle" onClick={logout}>
+                Sign out
+              </Button>
+            </Group>
           </Group>
           <Text c="dimmed">
             Signed in as <strong>{user?.email}</strong>
