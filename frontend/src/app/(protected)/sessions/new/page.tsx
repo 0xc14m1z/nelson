@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Box,
@@ -17,20 +17,17 @@ import {
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
-
-interface Model {
-  id: string;
-  slug: string;
-  display_name: string;
-  provider_slug: string;
-}
+import { useUserSettings } from "@/lib/hooks";
+import type { Model } from "@/lib/hooks";
 
 export default function NewSessionPage() {
   const router = useRouter();
+  const { data: settings } = useUserSettings();
   const [enquiry, setEnquiry] = useState("");
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [untilConsensus, setUntilConsensus] = useState(true);
   const [maxRounds, setMaxRounds] = useState<number>(5);
+  const [initialized, setInitialized] = useState(false);
 
   // Fetch available models (user has keys for these providers)
   const { data: models = [] } = useQuery<Model[]>({
@@ -40,6 +37,19 @@ export default function NewSessionPage() {
       return res.json();
     },
   });
+
+  useEffect(() => {
+    if (initialized || !settings || models.length === 0) return;
+
+    const availableIds = new Set(models.map((m) => m.id));
+    const validDefaults = settings.default_model_ids.filter((id) => availableIds.has(id));
+    if (validDefaults.length > 0) setSelectedModelIds(validDefaults);
+
+    setUntilConsensus(settings.max_rounds === null);
+    if (settings.max_rounds !== null) setMaxRounds(settings.max_rounds);
+
+    setInitialized(true);
+  }, [initialized, settings, models]);
 
   // Group models by provider
   const grouped = models.reduce<Record<string, Model[]>>((acc, m) => {

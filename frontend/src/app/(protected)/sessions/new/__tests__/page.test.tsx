@@ -60,6 +60,9 @@ vi.mock("@/lib/auth-context", () => ({
   }),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("@/lib/hooks", () => ({
+  useUserSettings: () => ({ data: undefined, isLoading: false }),
+}));
 
 import NewSessionPage from "../page";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
