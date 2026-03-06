@@ -16,13 +16,18 @@ Your task:
 4. Set has_disagreements to false ONLY if you believe all models have converged
    on a substantially similar answer."""
 
-SUMMARIZER_SYSTEM_PROMPT = """\
-You are a concise summarizer. Given a set of model responses from a consensus round,
-produce a brief summary capturing:
-- Key agreements between models
-- Remaining disagreements
-- What shifted from the previous round (if applicable)
-Keep the summary under 200 words."""
+SCORER_SYSTEM_PROMPT = """\
+You are evaluating a response to an enquiry.
+Rate your confidence in the response and extract its key points."""
+
+DISAGREEMENT_SYSTEM_PROMPT = """\
+You are evaluating whether models in a consensus process have converged.
+Identify any remaining disagreements between the responses."""
+
+FINAL_SUMMARIZER_SYSTEM_PROMPT = """\
+You are producing the final consensus answer.
+Given the responses from all models that have reached agreement,
+synthesize them into a single, comprehensive, definitive answer."""
 
 
 def build_responder_prompt(enquiry: str) -> str:
@@ -30,19 +35,46 @@ def build_responder_prompt(enquiry: str) -> str:
 
 
 def build_critic_prompt(
-    enquiry: str, prior_summary: str | None, responses: list[dict[str, str]]
+    enquiry: str,
+    responses: list[dict[str, str]],
+    disagreements: list[str] | None = None,
 ) -> str:
     parts = [f"Original enquiry:\n{enquiry}\n"]
-    if prior_summary:
-        parts.append(f"Summary of prior rounds:\n{prior_summary}\n")
-    parts.append("Latest responses from all models:\n")
+    parts.append("Responses from all models:\n")
+    for r in responses:
+        parts.append(f"--- {r['model_name']} ---\n{r['response']}\n")
+    if disagreements:
+        parts.append("Disagreements identified in the previous round:\n")
+        for d in disagreements:
+            parts.append(f"- {d}\n")
+    return "\n".join(parts)
+
+
+def build_scorer_prompt(enquiry: str, response: str) -> str:
+    return (
+        f"Original enquiry:\n{enquiry}\n\n"
+        f"Response to evaluate:\n{response}"
+    )
+
+
+def build_disagreement_prompt(
+    enquiry: str, responses: list[dict[str, str]]
+) -> str:
+    parts = [f"Original enquiry:\n{enquiry}\n"]
+    parts.append("Responses from all models:\n")
     for r in responses:
         parts.append(f"--- {r['model_name']} ---\n{r['response']}\n")
     return "\n".join(parts)
 
 
-def build_summarizer_prompt(responses: list[dict[str, str]]) -> str:
-    parts = ["Summarize the following model responses from this consensus round:\n"]
+def build_final_summary_prompt(
+    enquiry: str, responses: list[dict[str, str]]
+) -> str:
+    parts = [f"Original enquiry:\n{enquiry}\n"]
+    parts.append("Final agreed responses from all models:\n")
     for r in responses:
         parts.append(f"--- {r['model_name']} ---\n{r['response']}\n")
+    parts.append(
+        "\nSynthesize these into a single definitive answer."
+    )
     return "\n".join(parts)
