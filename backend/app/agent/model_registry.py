@@ -63,8 +63,8 @@ async def resolve_model(
             or_key = await get_decrypted_key(user_id, openrouter.id, db)
             if or_key:
                 # Map provider slugs to OpenRouter prefixes where they differ
-                OR_SLUG_MAP = {"xai": "x-ai"}
-                or_prefix = OR_SLUG_MAP.get(provider.slug, provider.slug)
+                or_slug_map = {"xai": "x-ai"}
+                or_prefix = or_slug_map.get(provider.slug, provider.slug)
                 return ResolvedModel(
                     api_key=or_key,
                     base_url=openrouter.base_url,

@@ -10,6 +10,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+import app.database as _db_mod
 from app.config import settings
 
 # ---------------------------------------------------------------------------
@@ -51,8 +52,6 @@ def _setup_test_db_sync() -> None:
 _setup_test_db_sync()
 
 # Swap engine and session factory BEFORE any test imports app.database.engine
-import app.database as _db_mod
-
 _original_engine = _db_mod.engine
 _original_factory = _db_mod.async_session_factory
 
