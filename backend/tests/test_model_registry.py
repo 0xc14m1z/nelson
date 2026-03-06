@@ -89,3 +89,21 @@ async def test_resolve_no_key_raises():
         with pytest.raises(NoKeyAvailableError):
             await resolve_model(user.id, model, session)
         await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_resolve_openrouter_native_model():
+    async with AsyncSession(engine) as session:
+        user = await _create_user(session)
+        openrouter = await _get_provider(session, "openrouter")
+        model = await _get_model(session, "deepseek/deepseek-v3.2")
+
+        await store_key(user.id, openrouter.id, "sk-or-key", session, skip_validation=True)
+
+        resolved = await resolve_model(user.id, model, session)
+        assert resolved.api_key == "sk-or-key"
+        assert resolved.base_url == "https://openrouter.ai/api/v1"
+        assert resolved.model_slug == "deepseek/deepseek-v3.2"  # NOT double-prefixed
+        assert resolved.provider_slug == "openrouter"
+        assert resolved.via_openrouter is False  # direct key, not fallback
+        await session.rollback()
