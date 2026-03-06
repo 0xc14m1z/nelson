@@ -7,7 +7,7 @@
 | 1 — Running skeleton | DONE | [#1](https://github.com/0xc14m1z/nelson/pull/1) (merged) |
 | 2 — Auth works | DONE | [#2](https://github.com/0xc14m1z/nelson/pull/2) (merged) |
 | 2.5 — Deployed on App Platform | DONE | [#3](https://github.com/0xc14m1z/nelson/pull/3) |
-| 3 — API keys + model config | TODO | |
+| 3 — API keys + model config | DONE | |
 | 4 — Core consensus | TODO | |
 | 5 — Live streaming UI | TODO | |
 | 6 — Production-ready | TODO | |
