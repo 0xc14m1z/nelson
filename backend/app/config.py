@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
-    fernet_key: str = "change-me-in-production"
+    fernet_key: str = "2lJYlIPWSL4O741w7QECrV46aeCY01t4zl2AwlVWNyI="
     resend_api_key: str = ""
     smtp_host: str = "localhost"
     smtp_port: int = 1025
