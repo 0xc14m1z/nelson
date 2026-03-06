@@ -1,25 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import {
-  ActionIcon,
   Box,
-  Collapse,
-  Group,
   Loader,
   Paper,
-  ScrollArea,
   Stack,
   Text,
 } from "@mantine/core";
-import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { ConsensusBanner } from "@/components/consensus/ConsensusBanner";
 import { PhaseDivider } from "@/components/consensus/PhaseDivider";
 import { StreamingColumn } from "@/components/consensus/StreamingColumn";
 import { useConsensusStream } from "@/hooks/useConsensusStream";
+import type { ModelStreamState, PhaseInfo } from "@/hooks/useConsensusStream";
 import type { SessionSummary } from "@/types/session";
 
 /* ------------------------------------------------------------------ */
@@ -41,6 +37,10 @@ interface SessionDetail extends SessionSummary {
     output_tokens: number;
     cost: number;
     duration_ms: number;
+    confidence: number | null;
+    key_points: string[] | null;
+    has_disagreements: boolean | null;
+    disagreements: string[] | null;
     created_at: string;
   }>;
 }
@@ -53,133 +53,74 @@ interface CatalogModel {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Completed session view                                            */
+/*  State reconstruction from API data                                */
 /* ------------------------------------------------------------------ */
 
-function CompletedSessionView({
-  session,
-  modelNames,
-}: {
-  session: SessionDetail;
-  modelNames: Map<string, string>;
-}) {
-  // Group llm_calls by round_number
-  const rounds = useMemo(() => {
-    const grouped = new Map<number, SessionDetail["llm_calls"]>();
-    for (const call of session.llm_calls) {
-      if (call.role === "summarizer") continue;
-      const existing = grouped.get(call.round_number) || [];
-      existing.push(call);
-      grouped.set(call.round_number, existing);
+interface ReconstructedState {
+  models: Map<string, ModelStreamState>;
+  phases: PhaseInfo[];
+}
+
+function buildStateFromCalls(
+  llmCalls: SessionDetail["llm_calls"],
+  modelNames: Map<string, string>,
+): ReconstructedState {
+  const models = new Map<string, ModelStreamState>();
+  const roundsMap = new Map<number, Map<string, SessionDetail["llm_calls"][0]>>();
+
+  for (const call of llmCalls) {
+    if (call.role === "summarizer") continue;
+    const key = `${call.llm_model_id}-${call.round_number}`;
+    models.set(key, {
+      llm_model_id: call.llm_model_id,
+      round_number: call.round_number,
+      role: call.role as "responder" | "critic" | "summarizer",
+      text: call.response || "",
+      isStreaming: false,
+      isDone: true,
+      error: call.error ?? null,
+      structured: {
+        ...(call.confidence != null ? { confidence: call.confidence } : {}),
+        ...(call.key_points != null ? { key_points: call.key_points } : {}),
+        ...(call.has_disagreements != null ? { has_disagreements: call.has_disagreements } : {}),
+        ...(call.disagreements != null ? { disagreements: call.disagreements } : {}),
+      },
+      input_tokens: call.input_tokens,
+      output_tokens: call.output_tokens,
+      cost: call.cost,
+      duration_ms: call.duration_ms,
+    });
+
+    if (!roundsMap.has(call.round_number)) {
+      roundsMap.set(call.round_number, new Map());
     }
-    return [...grouped.entries()].sort(([a], [b]) => a - b);
-  }, [session.llm_calls]);
+    roundsMap.get(call.round_number)!.set(call.llm_model_id, call);
+  }
 
-  const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
+  const phases: PhaseInfo[] = [...roundsMap.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([roundNum, callsMap]) => {
+      const calls = [...callsMap.values()];
+      const role = calls[0]?.role ?? "responder";
+      return {
+        round_number: roundNum,
+        phase: role === "responder" ? "responder_done" : "critic_done",
+        models: calls
+          .filter((c) => !c.error)
+          .map((c) => ({
+            llm_model_id: c.llm_model_id,
+            model_name: modelNames.get(c.llm_model_id) ?? `${c.provider_slug}/${c.model_slug}`,
+            ...(c.confidence != null ? { confidence: c.confidence } : {}),
+            ...(c.key_points != null ? { key_points: c.key_points } : {}),
+            ...(c.has_disagreements != null ? { has_disagreements: c.has_disagreements } : {}),
+            ...(c.disagreements != null ? { disagreements: c.disagreements } : {}),
+          })),
+        roundSummary: null,
+        collapsed: true,
+      };
+    });
 
-  const toggleRound = (roundNum: number) => {
-    setCollapsed((prev) => ({ ...prev, [roundNum]: !prev[roundNum] }));
-  };
-
-  return (
-    <Stack gap="md">
-      {rounds.map(([roundNum, calls]) => {
-        const isCollapsed = collapsed[roundNum] ?? false;
-        const label =
-          roundNum === 1
-            ? `Round ${roundNum} \u2014 Initial Responses`
-            : `Round ${roundNum} \u2014 Critique`;
-
-        return (
-          <Box key={roundNum}>
-            {/* Round header */}
-            <Paper
-              p="sm"
-              radius="md"
-              withBorder
-              style={{ cursor: "pointer" }}
-              onClick={() => toggleRound(roundNum)}
-            >
-              <Group gap="sm">
-                <ActionIcon
-                  variant="subtle"
-                  size="sm"
-                  aria-label={`Toggle round ${roundNum}`}
-                >
-                  {isCollapsed ? (
-                    <IconChevronRight size={16} />
-                  ) : (
-                    <IconChevronDown size={16} />
-                  )}
-                </ActionIcon>
-                <Text fw={600} size="sm">
-                  {label}
-                </Text>
-                <Text size="xs" c="dimmed">
-                  ({calls.length} model{calls.length !== 1 ? "s" : ""})
-                </Text>
-              </Group>
-            </Paper>
-
-            {/* Round columns */}
-            <Collapse in={!isCollapsed}>
-              <Box
-                mt="sm"
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  overflowX: "auto",
-                }}
-              >
-                {calls.map((call) => {
-                  const displayName =
-                    modelNames.get(call.llm_model_id) ??
-                    `${call.provider_slug}/${call.model_slug}`;
-
-                  return (
-                    <Paper
-                      key={call.id}
-                      p="md"
-                      radius="md"
-                      style={{
-                        flex: "1 1 0",
-                        minWidth: 350,
-                        display: "flex",
-                        flexDirection: "column",
-                        opacity: call.error ? 0.5 : 1,
-                      }}
-                    >
-                      <Text fw={600} size="sm" mb="sm">
-                        {displayName}
-                      </Text>
-                      <ScrollArea style={{ flex: 1, minHeight: 200 }}>
-                        <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
-                          {call.error ?? call.response}
-                        </Text>
-                      </ScrollArea>
-                    </Paper>
-                  );
-                })}
-              </Box>
-            </Collapse>
-          </Box>
-        );
-      })}
-
-      {/* Terminal banner */}
-      <ConsensusBanner
-        type={session.status as "consensus_reached" | "max_rounds_reached" | "failed"}
-        event={{
-          status: session.status,
-          current_round: session.current_round,
-          total_input_tokens: session.total_input_tokens,
-          total_output_tokens: session.total_output_tokens,
-          total_cost: session.total_cost,
-          total_duration_ms: session.total_duration_ms,
-        }}
-      />
-    </Stack>
-  );
+  return { models, phases };
 }
 
 /* ------------------------------------------------------------------ */
@@ -253,8 +194,44 @@ export default function SessionPage() {
     return currentRoundModels.every((e) => e.model.isDone);
   }, [currentRoundModels]);
 
+  // Reconstruct state from API data for completed sessions
+  const reconstructed = useMemo(() => {
+    if (!isTerminal || !session) return null;
+    return buildStateFromCalls(session.llm_calls, modelNames);
+  }, [isTerminal, session, modelNames]);
+
+  const [collapsedPhases, setCollapsedPhases] = useState<Record<number, boolean>>({});
+
+  const completedPhases = useMemo(() => {
+    if (!reconstructed) return [];
+    return reconstructed.phases.map((p, i) => ({
+      ...p,
+      collapsed: collapsedPhases[i] ?? true,
+    }));
+  }, [reconstructed, collapsedPhases]);
+
+  const toggleCompletedPhase = useCallback((index: number) => {
+    setCollapsedPhases((prev) => ({ ...prev, [index]: !(prev[index] ?? true) }));
+  }, []);
+
   /* ---------- Terminal: completed session view ---------- */
-  if (isTerminal && session) {
+  if (isTerminal && session && reconstructed) {
+    // All phases except the last are shown as PhaseDividers (collapsed)
+    // The last round's models are shown as StreamingColumns
+    const allPhases = completedPhases;
+    const pastPhases = allPhases.slice(0, -1);
+    const lastPhase = allPhases[allPhases.length - 1];
+
+    // Get the last round's models from the reconstructed map
+    const lastRoundModels: Array<{ key: string; model: ModelStreamState }> = [];
+    if (lastPhase) {
+      for (const [key, model] of reconstructed.models) {
+        if (model.round_number === lastPhase.round_number) {
+          lastRoundModels.push({ key, model });
+        }
+      }
+    }
+
     return (
       <Stack gap="md">
         {/* Enquiry header */}
@@ -265,7 +242,48 @@ export default function SessionPage() {
           <Text size="sm">{session.enquiry}</Text>
         </Paper>
 
-        <CompletedSessionView session={session} modelNames={modelNames} />
+        {/* Past phases as PhaseDividers */}
+        {pastPhases.map((phase, index) => (
+          <PhaseDivider
+            key={index}
+            phase={phase}
+            modelNames={modelNames}
+            onToggle={() => toggleCompletedPhase(index)}
+          />
+        ))}
+
+        {/* Last round's models as StreamingColumns */}
+        {lastRoundModels.length > 0 && (
+          <Box
+            style={{
+              display: "flex",
+              gap: 12,
+              overflowX: "auto",
+            }}
+          >
+            {lastRoundModels.map(({ key, model }) => (
+              <StreamingColumn
+                key={key}
+                model={model}
+                displayName={modelNames.get(model.llm_model_id) ?? model.llm_model_id}
+                allModelsDone={true}
+              />
+            ))}
+          </Box>
+        )}
+
+        {/* Terminal banner */}
+        <ConsensusBanner
+          type={session.status as "consensus_reached" | "max_rounds_reached" | "failed"}
+          event={{
+            status: session.status,
+            current_round: session.current_round,
+            total_input_tokens: session.total_input_tokens,
+            total_output_tokens: session.total_output_tokens,
+            total_cost: session.total_cost,
+            total_duration_ms: session.total_duration_ms,
+          }}
+        />
       </Stack>
     );
   }

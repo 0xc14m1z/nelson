@@ -36,6 +36,7 @@ export interface PhaseInfo {
     model_name: string;
     confidence?: number;
     key_points?: string[];
+    has_disagreements?: boolean;
     disagreements?: string[];
   }>;
   roundSummary: RoundSummaryEvent | null;

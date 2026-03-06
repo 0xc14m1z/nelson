@@ -13,21 +13,6 @@ export interface SessionSummary {
   model_ids: string[];
 }
 
-export interface LLMCallEvent {
-  id: string;
-  model_slug: string;
-  provider_slug: string;
-  model_name: string;
-  round_number: number;
-  role: "responder" | "critic" | "summarizer";
-  response: string;
-  error: string | null;
-  input_tokens: number;
-  output_tokens: number;
-  cost: number;
-  duration_ms: number;
-}
-
 export interface TerminalEvent {
   status: string;
   current_round: number;
@@ -44,18 +29,6 @@ export type SessionStatus =
   | "consensus_reached"
   | "max_rounds_reached"
   | "failed";
-
-// Color assignments for models in chat UI
-export const MODEL_COLORS = [
-  "blue",
-  "green",
-  "orange",
-  "grape",
-  "cyan",
-  "pink",
-  "teal",
-  "indigo",
-] as const;
 
 // --- Streaming event types ---
 
