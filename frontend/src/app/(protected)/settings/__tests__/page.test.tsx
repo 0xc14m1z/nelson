@@ -2,26 +2,27 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
 
-// Stable mock data (declared outside mock factory via vi.hoisted to avoid infinite re-renders)
-const { mockProviders, mockApiKeys, mockModels, mockSettings } = vi.hoisted(
-  () => ({
-    mockProviders: [
-      { id: "1", slug: "openai", display_name: "OpenAI", base_url: "https://api.openai.com/v1", is_active: true },
-      { id: "2", slug: "anthropic", display_name: "Anthropic", base_url: "https://api.anthropic.com", is_active: true },
-    ],
-    mockApiKeys: [
-      {
-        id: "k1", provider_id: "1", provider_slug: "openai",
-        provider_display_name: "OpenAI", masked_key: "****2345",
-        is_valid: true, validated_at: "2026-01-01T00:00:00Z", created_at: "2026-01-01T00:00:00Z",
-      },
-    ],
-    mockModels: [
-      { id: "m1", provider_id: "1", provider_slug: "openai", slug: "gpt-4o", display_name: "GPT-4o", model_type: "chat", tokens_per_second: null, is_active: true },
-    ],
-    mockSettings: { max_rounds: null, default_model_ids: [] as string[] },
-  })
-);
+// Stable mock data
+const mockProviders = [
+  { id: "1", slug: "openai", display_name: "OpenAI", base_url: "https://api.openai.com/v1", is_active: true },
+  { id: "2", slug: "anthropic", display_name: "Anthropic", base_url: "https://api.anthropic.com", is_active: true },
+];
+const mockApiKeys = [
+  {
+    id: "k1", provider_id: "1", provider_slug: "openai",
+    provider_display_name: "OpenAI", masked_key: "****2345",
+    is_valid: true, validated_at: "2026-01-01T00:00:00Z", created_at: "2026-01-01T00:00:00Z",
+  },
+];
+const mockModels = [
+  {
+    id: "m1", provider_id: "1", provider_slug: "openai", slug: "gpt-5",
+    display_name: "GPT-5", model_type: "chat", tokens_per_second: null,
+    input_price_per_mtok: "1.25", output_price_per_mtok: "10.00",
+    context_window: 400000, is_active: true,
+  },
+];
+const mockSettings = { max_rounds: null, default_model_ids: [] as string[] };
 
 // Mock @mantine/core with lightweight components to avoid OOM from emotion CSS-in-JS
 vi.mock("@mantine/core", () => {
@@ -35,10 +36,11 @@ vi.mock("@mantine/core", () => {
     { Group: wrap() }
   );
   return {
-    Badge: wrap(), Button: wrap(), Checkbox, Container: wrap(), Group: wrap(),
-    MantineProvider: wrap(), Modal: (props: Record<string, unknown>) =>
+    Badge: wrap(), Button: wrap(), Checkbox, Container: wrap(), Divider: wrap(),
+    Group: wrap(), Loader: wrap(), MantineProvider: wrap(),
+    Modal: (props: Record<string, unknown>) =>
       props.opened ? R.createElement("dialog", null, props.children) : null,
-    NumberInput: wrap(), Paper: wrap(), Stack: wrap(),
+    NumberInput: wrap(), Paper: wrap(), ScrollArea: { Autosize: wrap() }, Stack: wrap(),
     Switch: (props: Record<string, unknown>) =>
       R.createElement("label", null, R.createElement("input", { type: "checkbox" }), props.label),
     Tabs, Text: wrap(), TextInput: wrap(),
