@@ -10,6 +10,7 @@ from sse_starlette import EventSourceResponse
 from starlette.requests import Request
 
 from app.auth.dependencies import get_current_user
+from app.consensus.broadcast import get_broadcast
 from app.consensus.schemas import (
     CreateSessionRequest,
     LLMCallResponse,
@@ -120,11 +121,9 @@ async def list_sessions(
 
 
 async def _session_event_generator(request: Request, session_id: UUID, user_id: UUID):
-    """Replay existing events then poll for new ones."""
-    last_seen_count = 0
-    keepalive_interval = 15  # seconds
-    poll_interval = 1  # seconds
-    polls_per_keepalive = keepalive_interval // poll_interval
+    """Replay completed calls from DB, then stream live events from broadcast."""
+    keepalive_seconds = 15
+    terminal_events = {"consensus_reached", "max_rounds_reached", "failed"}
 
     async with async_session_factory() as db:
         # Verify session belongs to user
@@ -132,71 +131,88 @@ async def _session_event_generator(request: Request, session_id: UUID, user_id: 
         if not session or session.user_id != user_id:
             return
 
-        poll_count = 0
-        while True:
-            if await request.is_disconnected():
-                break
+        # ── 1. Replay completed LLM calls from DB ──────────────────────
+        result = await db.execute(
+            select(LLMCall)
+            .where(LLMCall.session_id == session_id)
+            .order_by(LLMCall.round_number, LLMCall.created_at)
+        )
+        calls = result.scalars().all()
 
-            # Fetch all calls after last_seen_count
-            result = await db.execute(
-                select(LLMCall)
-                .where(LLMCall.session_id == session_id)
-                .options(joinedload(LLMCall.llm_model).joinedload(LLMModel.provider))
-                .order_by(LLMCall.round_number, LLMCall.created_at)
-            )
-            calls = result.scalars().unique().all()
+        for call in calls:
+            yield {
+                "event": "model_done" if not call.error else "model_error",
+                "data": json.dumps({
+                    "llm_model_id": str(call.llm_model_id),
+                    "round_number": call.round_number,
+                    "role": call.role,
+                    "response": call.response,
+                    "error": call.error,
+                    "structured": {},
+                    "input_tokens": call.input_tokens or 0,
+                    "output_tokens": call.output_tokens or 0,
+                    "cost": float(call.cost) if call.cost else 0,
+                    "duration_ms": call.duration_ms or 0,
+                }),
+            }
 
-            # Send new calls
-            for call in calls[last_seen_count:]:
-                model_slug = call.llm_model.slug
-                provider_slug = call.llm_model.provider.slug
-                event_type = call.role  # "responder", "critic", "summarizer"
-                if call.error:
-                    event_type = "model_dropped"
+        # ── 2. If session is terminal, send final event and stop ───────
+        await db.refresh(session)
+        if session.status in terminal_events:
+            yield {
+                "event": session.status,
+                "data": json.dumps({
+                    "status": session.status,
+                    "current_round": session.current_round,
+                    "total_input_tokens": session.total_input_tokens,
+                    "total_output_tokens": session.total_output_tokens,
+                    "total_cost": float(session.total_cost),
+                    "total_duration_ms": session.total_duration_ms,
+                }),
+            }
+            return
+
+        # ── 3. Session is still running — attach to live broadcast ─────
+        broadcast = get_broadcast(session_id)
+        if broadcast is None:
+            # Missed the broadcast window; client will retry
+            return
+
+        # Send catchup for any in-progress model streams
+        for model_id, text_so_far in broadcast.get_catchup().items():
+            yield {
+                "event": "model_catchup",
+                "data": json.dumps({
+                    "llm_model_id": model_id,
+                    "text": text_so_far,
+                }),
+            }
+
+        consumer = broadcast.subscribe()
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+
+                try:
+                    event = await asyncio.wait_for(
+                        consumer.__anext__(), timeout=keepalive_seconds,
+                    )
+                except TimeoutError:
+                    yield {"comment": "keepalive"}
+                    continue
+                except StopAsyncIteration:
+                    break
 
                 yield {
-                    "event": event_type,
-                    "data": json.dumps({
-                        "id": str(call.id),
-                        "model_slug": model_slug,
-                        "provider_slug": provider_slug,
-                        "model_name": f"{provider_slug}/{model_slug}",
-                        "round_number": call.round_number,
-                        "role": call.role,
-                        "response": call.response,
-                        "error": call.error,
-                        "input_tokens": call.input_tokens,
-                        "output_tokens": call.output_tokens,
-                        "cost": float(call.cost),
-                        "duration_ms": call.duration_ms,
-                    }),
+                    "event": event.event,
+                    "data": json.dumps(event.data),
                 }
-                last_seen_count += 1
 
-            # Check session status
-            await db.refresh(session)
-            terminal_statuses = ("consensus_reached", "max_rounds_reached", "failed")
-            if session.status in terminal_statuses:
-                yield {
-                    "event": session.status,
-                    "data": json.dumps({
-                        "status": session.status,
-                        "current_round": session.current_round,
-                        "total_input_tokens": session.total_input_tokens,
-                        "total_output_tokens": session.total_output_tokens,
-                        "total_cost": float(session.total_cost),
-                        "total_duration_ms": session.total_duration_ms,
-                    }),
-                }
-                break
-
-            # Keepalive ping
-            poll_count += 1
-            if poll_count >= polls_per_keepalive:
-                yield {"comment": "keepalive"}
-                poll_count = 0
-
-            await asyncio.sleep(poll_interval)
+                if event.event in terminal_events:
+                    break
+        finally:
+            broadcast.unsubscribe(consumer)
 
 
 @router.get("/{session_id}/stream")
