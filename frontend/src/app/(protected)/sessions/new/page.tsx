@@ -118,22 +118,22 @@ export default function NewSessionPage() {
         <Group gap="xs">
           {selectedModelIds
             .map((id) => models.find((m) => m.id === id))
-            .filter(Boolean)
+            .filter((m): m is Model => m !== undefined)
             .map((m) => (
               <Pill
-                key={m!.id}
+                key={m.id}
                 withRemoveButton
-                onRemove={() => toggleModel(m!.id)}
+                onRemove={() => toggleModel(m.id)}
                 removeButtonProps={{
                   disabled: selectedModelIds.length <= 2,
                 }}
               >
-                {m!.display_name}
+                {m.display_name}
               </Pill>
             ))}
           <Popover width={300} position="bottom-start" shadow="md">
             <Popover.Target>
-              <ActionIcon variant="subtle" size="sm">
+              <ActionIcon variant="subtle" size="sm" aria-label="Add model">
                 <IconPlus size={16} />
               </ActionIcon>
             </Popover.Target>
@@ -149,7 +149,10 @@ export default function NewSessionPage() {
                       return (
                         <UnstyledButton
                           key={m.id}
-                          onClick={() => toggleModel(m.id)}
+                          onClick={() => {
+                            if (selected && selectedModelIds.length <= 2) return;
+                            toggleModel(m.id);
+                          }}
                           w="100%"
                           py={4}
                           px="xs"
