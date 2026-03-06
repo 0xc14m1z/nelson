@@ -22,7 +22,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://nelson:nelson@db:5432/nelson
       JWT_SECRET: local-dev-secret
-      FERNET_KEY: local-dev-fernet-key
+      FERNET_KEY: 2lJYlIPWSL4O741w7QECrV46aeCY01t4zl2AwlVWNyI=
       CORS_ORIGINS: '["http://localhost:3000"]'
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
