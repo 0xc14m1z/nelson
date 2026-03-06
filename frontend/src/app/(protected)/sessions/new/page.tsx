@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   ActionIcon,
   Box,
-  Button,
   Group,
   NumberInput,
   Pill,
@@ -15,10 +14,9 @@ import {
   Switch,
   Text,
   Textarea,
-  Title,
   UnstyledButton,
 } from "@mantine/core";
-import { IconCheck, IconPlus } from "@tabler/icons-react";
+import { IconArrowRight, IconCheck, IconPlus } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
@@ -97,19 +95,36 @@ export default function NewSessionPage() {
 
   return (
     <Stack gap="lg" maw={700}>
-      <Title order={2}>New Enquiry</Title>
-
       <Textarea
-        label="Your question"
         placeholder="Ask anything..."
-        minRows={4}
+        radius="xl"
+        size="md"
         autosize
+        minRows={1}
         value={enquiry}
         onChange={(e) => setEnquiry(e.currentTarget.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canSubmit) {
+            e.preventDefault();
             createSession.mutate();
           }
+        }}
+        rightSectionWidth={42}
+        rightSection={
+          <ActionIcon
+            size={32}
+            radius="xl"
+            variant="filled"
+            disabled={!canSubmit}
+            loading={createSession.isPending}
+            onClick={() => createSession.mutate()}
+            aria-label="Start consensus"
+          >
+            <IconArrowRight size={18} stroke={1.5} />
+          </ActionIcon>
+        }
+        styles={{
+          input: { fieldSizing: "content" as never },
         }}
       />
 
@@ -190,14 +205,6 @@ export default function NewSessionPage() {
           />
         )}
       </Group>
-
-      <Button
-        onClick={() => createSession.mutate()}
-        loading={createSession.isPending}
-        disabled={!canSubmit}
-      >
-        Start Consensus
-      </Button>
     </Stack>
   );
 }
