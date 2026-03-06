@@ -16,7 +16,7 @@ import {
   Textarea,
   UnstyledButton,
 } from "@mantine/core";
-import { IconArrowRight, IconCheck, IconPlus } from "@tabler/icons-react";
+import { IconArrowRight, IconBrain, IconCheck, IconPlus } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
@@ -94,10 +94,11 @@ export default function NewSessionPage() {
   const canSubmit = enquiry.trim().length > 0 && selectedModelIds.length >= 2;
 
   return (
-    <Stack gap="lg" maw={700}>
+    <Box style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "var(--mantine-spacing-md)" }}>
+    <Stack gap="xs" maw={700} mx="auto">
       <Textarea
         placeholder="Ask anything..."
-        radius="xl"
+        radius="md"
         size="md"
         autosize
         minRows={1}
@@ -113,7 +114,7 @@ export default function NewSessionPage() {
         rightSection={
           <ActionIcon
             size={32}
-            radius="xl"
+            radius="md"
             variant="filled"
             disabled={!canSubmit}
             loading={createSession.isPending}
@@ -125,12 +126,39 @@ export default function NewSessionPage() {
         }
         styles={{
           input: { fieldSizing: "content" as never },
+          section: { alignSelf: "flex-end", marginBottom: 4 },
         }}
       />
 
       <Box>
-        <Text fw={500} mb="xs">Models</Text>
         <Group gap="xs">
+          <Popover width={220} position="bottom-start" shadow="md">
+            <Popover.Target>
+              <ActionIcon variant="subtle" size="sm" aria-label="Consensus settings">
+                <IconBrain size={16} />
+              </ActionIcon>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <Stack gap="xs">
+                <Switch
+                  label="Run until consensus"
+                  size="xs"
+                  checked={untilConsensus}
+                  onChange={(e) => setUntilConsensus(e.currentTarget.checked)}
+                />
+                {!untilConsensus && (
+                  <NumberInput
+                    label="Max rounds"
+                    size="xs"
+                    value={maxRounds}
+                    onChange={(v) => setMaxRounds(Number(v))}
+                    min={2}
+                    max={20}
+                  />
+                )}
+              </Stack>
+            </Popover.Dropdown>
+          </Popover>
           {selectedModelIds
             .map((id) => models.find((m) => m.id === id))
             .filter((m): m is Model => m !== undefined)
@@ -152,6 +180,7 @@ export default function NewSessionPage() {
                 <IconPlus size={16} />
               </ActionIcon>
             </Popover.Target>
+
             <Popover.Dropdown>
               <ScrollArea.Autosize mah={300}>
                 {Object.entries(grouped).map(([provider, providerModels]) => (
@@ -187,24 +216,7 @@ export default function NewSessionPage() {
           </Popover>
         </Group>
       </Box>
-
-      <Group>
-        <Switch
-          label="Run until consensus"
-          checked={untilConsensus}
-          onChange={(e) => setUntilConsensus(e.currentTarget.checked)}
-        />
-        {!untilConsensus && (
-          <NumberInput
-            label="Max rounds"
-            value={maxRounds}
-            onChange={(v) => setMaxRounds(Number(v))}
-            min={2}
-            max={20}
-            w={100}
-          />
-        )}
-      </Group>
     </Stack>
+    </Box>
   );
 }

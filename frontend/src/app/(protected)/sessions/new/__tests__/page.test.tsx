@@ -72,7 +72,7 @@ vi.mock("@tabler/icons-react", () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const R = require("react");
   const icon = () => () => R.createElement("span");
-  return { IconArrowRight: icon(), IconCheck: icon(), IconPlus: icon() };
+  return { IconArrowRight: icon(), IconBrain: icon(), IconCheck: icon(), IconPlus: icon() };
 });
 
 vi.mock("@tanstack/react-query", async () => {
