@@ -53,15 +53,9 @@ async def search_openrouter_models(
         prompt_price = pricing.get("prompt")
         completion_price = pricing.get("completion")
 
-        input_price = (
-            Decimal(str(prompt_price)) * 1_000_000
-            if prompt_price is not None
-            else None
-        )
+        input_price = Decimal(str(prompt_price)) * 1_000_000 if prompt_price is not None else None
         output_price = (
-            Decimal(str(completion_price)) * 1_000_000
-            if completion_price is not None
-            else None
+            Decimal(str(completion_price)) * 1_000_000 if completion_price is not None else None
         )
 
         context_length = m.get("context_length")

@@ -50,9 +50,7 @@ async def update_user_settings(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        result = await update_settings(
-            current_user.id, body.max_rounds, body.default_model_ids, db
-        )
+        result = await update_settings(current_user.id, body.max_rounds, body.default_model_ids, db)
         await db.commit()
         return result
     except ValueError as e:

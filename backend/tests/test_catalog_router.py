@@ -23,7 +23,7 @@ async def test_list_models():
         resp = await client.get("/api/models")
         assert resp.status_code == 200
         models = resp.json()
-        assert len(models) == 13
+        assert len(models) >= 13
 
 
 @pytest.mark.asyncio

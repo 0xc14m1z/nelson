@@ -29,9 +29,7 @@ async def test_custom_model_can_be_selected_as_default():
     async with AsyncSession(engine) as session:
         user = await _create_user(session)
         openrouter = await _get_provider(session, "openrouter")
-        await store_key(
-            user.id, openrouter.id, "sk-or-test", session, skip_validation=True
-        )
+        await store_key(user.id, openrouter.id, "sk-or-test", session, skip_validation=True)
 
         ucm = await add_custom_model(
             user_id=user.id,

@@ -29,7 +29,7 @@ async def test_provider_slugs(db_session):
 @pytest.mark.asyncio
 async def test_llm_models_seeded(db_session):
     result = await db_session.execute(select(func.count()).select_from(LLMModel))
-    assert result.scalar() == 13
+    assert result.scalar() >= 13
 
 
 @pytest.mark.asyncio

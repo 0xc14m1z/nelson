@@ -12,9 +12,7 @@ async def get_settings(user_id: uuid.UUID, db: AsyncSession) -> dict:
     settings = result.scalar_one_or_none()
 
     model_ids_result = await db.execute(
-        select(user_default_models.c.llm_model_id).where(
-            user_default_models.c.user_id == user_id
-        )
+        select(user_default_models.c.llm_model_id).where(user_default_models.c.user_id == user_id)
     )
     model_ids = [row[0] for row in model_ids_result.all()]
 
@@ -54,9 +52,7 @@ async def update_settings(
     await db.flush()
 
     # Sync default models: delete all, re-insert
-    await db.execute(
-        delete(user_default_models).where(user_default_models.c.user_id == user_id)
-    )
+    await db.execute(delete(user_default_models).where(user_default_models.c.user_id == user_id))
     if default_model_ids:
         await db.execute(
             user_default_models.insert(),

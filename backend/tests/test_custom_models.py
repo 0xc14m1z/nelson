@@ -12,9 +12,16 @@ from app.main import app
 from app.models import ApiKey, Provider, User
 
 
+def _unique_email(prefix: str) -> str:
+    """Generate a unique email to avoid conflicts across test runs."""
+    return f"{prefix}-{uuid.uuid4().hex[:8]}@example.com"
+
+
 async def _setup_user_with_openrouter_key(
-    email: str = "custom-models@example.com",
+    email: str | None = None,
 ) -> tuple[str, uuid.UUID]:
+    if email is None:
+        email = _unique_email("cm")
     """Create a user and store an OpenRouter API key. Returns (jwt, user_id)."""
     async with AsyncSession(engine) as session:
         user = User(email=email)
@@ -23,9 +30,7 @@ async def _setup_user_with_openrouter_key(
         user_id = user.id
 
         # Get OpenRouter provider
-        result = await session.execute(
-            select(Provider).where(Provider.slug == "openrouter")
-        )
+        result = await session.execute(select(Provider).where(Provider.slug == "openrouter"))
         provider = result.scalar_one()
 
         # Store a fake API key
@@ -46,7 +51,7 @@ async def _setup_user_with_openrouter_key(
 async def test_add_custom_model():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        token, _ = await _setup_user_with_openrouter_key("cm-add@example.com")
+        token, _ = await _setup_user_with_openrouter_key(_unique_email("cm-add"))
         headers = {"Authorization": f"Bearer {token}"}
 
         resp = await client.post(
@@ -73,7 +78,7 @@ async def test_add_custom_model():
 async def test_add_duplicate_custom_model():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        token, _ = await _setup_user_with_openrouter_key("cm-dup@example.com")
+        token, _ = await _setup_user_with_openrouter_key(_unique_email("cm-dup"))
         headers = {"Authorization": f"Bearer {token}"}
 
         body = {
@@ -100,7 +105,7 @@ async def test_add_duplicate_custom_model():
 async def test_list_custom_models():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        token, _ = await _setup_user_with_openrouter_key("cm-list@example.com")
+        token, _ = await _setup_user_with_openrouter_key(_unique_email("cm-list"))
         headers = {"Authorization": f"Bearer {token}"}
 
         # Add a model first
@@ -128,7 +133,7 @@ async def test_list_custom_models():
 async def test_delete_custom_model():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        token, _ = await _setup_user_with_openrouter_key("cm-del@example.com")
+        token, _ = await _setup_user_with_openrouter_key(_unique_email("cm-del"))
         headers = {"Authorization": f"Bearer {token}"}
 
         resp = await client.post(
@@ -161,7 +166,7 @@ async def test_delete_custom_model():
 async def test_delete_nonexistent_custom_model():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        token, _ = await _setup_user_with_openrouter_key("cm-del404@example.com")
+        token, _ = await _setup_user_with_openrouter_key(_unique_email("cm-del404"))
         headers = {"Authorization": f"Bearer {token}"}
 
         fake_id = str(uuid.uuid4())

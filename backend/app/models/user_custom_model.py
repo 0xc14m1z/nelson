@@ -8,9 +8,7 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKey
 
 class UserCustomModel(UUIDPrimaryKey, TimestampMixin, Base):
     __tablename__ = "user_custom_models"
-    __table_args__ = (
-        UniqueConstraint("user_id", "llm_model_id", name="uq_user_custom_model"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "llm_model_id", name="uq_user_custom_model"),)
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True

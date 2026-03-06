@@ -26,9 +26,7 @@ async def list_models(
     db: AsyncSession = Depends(get_db),
 ):
     query = (
-        select(LLMModel)
-        .options(joinedload(LLMModel.provider))
-        .where(LLMModel.is_active.is_(True))
+        select(LLMModel).options(joinedload(LLMModel.provider)).where(LLMModel.is_active.is_(True))
     )
     if provider_id:
         query = query.where(LLMModel.provider_id == provider_id)

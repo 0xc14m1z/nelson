@@ -17,7 +17,7 @@ const { mockProviders, mockApiKeys, mockModels, mockSettings } = vi.hoisted(
       },
     ],
     mockModels: [
-      { id: "m1", provider_id: "1", provider_slug: "openai", slug: "gpt-4o", display_name: "GPT-4o", is_active: true },
+      { id: "m1", provider_id: "1", provider_slug: "openai", slug: "gpt-4o", display_name: "GPT-4o", model_type: "chat", tokens_per_second: null, is_active: true },
     ],
     mockSettings: { max_rounds: null, default_model_ids: [] as string[] },
   })
@@ -58,6 +58,10 @@ vi.mock("../../../../lib/hooks", () => ({
   useDeleteKey: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useValidateKey: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateSettings: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCustomModels: () => ({ data: [], isLoading: false }),
+  useAddCustomModel: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteCustomModel: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useOpenRouterModels: () => ({ data: [], isLoading: false, isFetching: false }),
 }));
 vi.mock("../../../../lib/auth-context", () => ({
   useAuth: () => ({
