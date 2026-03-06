@@ -35,7 +35,7 @@ function VerifyContent() {
 
         const data = await resp.json();
         await login(data.access_token);
-        router.push("/dashboard");
+        router.push("/");
       } catch {
         setError("Something went wrong. Please try again.");
       }
