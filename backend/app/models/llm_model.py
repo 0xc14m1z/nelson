@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKey
@@ -24,5 +24,7 @@ class LLMModel(UUIDPrimaryKey, TimestampMixin, Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     context_window: Mapped[int] = mapped_column(Integer, nullable=False, default=128000)
+    model_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    tokens_per_second: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     provider: Mapped["Provider"] = relationship(back_populates="models")  # noqa: F821, UP037
