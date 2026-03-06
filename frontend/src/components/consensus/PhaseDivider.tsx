@@ -13,7 +13,6 @@ export function PhaseDivider({ phase, modelNames, onToggle }: PhaseDividerProps)
   const failedCount = 0; // Could be extended when failure info is in PhaseChangeEvent
 
   const label =
-    phase.phase ||
     `Round ${phase.round_number}${phase.round_number > 1 ? " — Critique" : " — Initial Responses"}`;
 
   return (
