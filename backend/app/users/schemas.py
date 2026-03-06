@@ -20,8 +20,10 @@ class UpdateProfileRequest(BaseModel):
 class SettingsResponse(BaseModel):
     max_rounds: int | None = None
     default_model_ids: list[uuid.UUID] = Field(default_factory=list)
+    summarizer_model_id: uuid.UUID | None = None
 
 
 class UpdateSettingsRequest(BaseModel):
     max_rounds: int | None = None
     default_model_ids: list[uuid.UUID] = Field(default_factory=list)
+    summarizer_model_id: uuid.UUID | None = None

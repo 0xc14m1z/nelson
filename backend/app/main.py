@@ -1,14 +1,26 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth.router import router as auth_router
 from app.catalog.router import router as catalog_router
 from app.config import settings
+from app.consensus.router import router as sessions_router
+from app.consensus.service import cleanup_orphaned_sessions
 from app.keys.router import router as keys_router
 from app.openrouter.router import router as openrouter_router
 from app.users.router import router as users_router
 
-app = FastAPI(title="Nelson", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    await cleanup_orphaned_sessions()
+    yield
+
+
+app = FastAPI(title="Nelson", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,6 +35,7 @@ app.include_router(auth_router)
 app.include_router(catalog_router)
 app.include_router(keys_router)
 app.include_router(openrouter_router)
+app.include_router(sessions_router)
 app.include_router(users_router)
 
 

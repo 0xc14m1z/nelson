@@ -53,7 +53,7 @@ vi.mock("@mantine/core", () => {
     Group: wrap(), Loader: wrap(), MantineProvider: wrap(),
     Modal: (props: Record<string, unknown>) =>
       props.opened ? R.createElement("dialog", null, props.children) : null,
-    NumberInput: wrap(), Paper: wrap(), ScrollArea: { Autosize: wrap() }, Stack: wrap(),
+    NumberInput: wrap(), Paper: wrap(), ScrollArea: { Autosize: wrap() }, Select: wrap(), Stack: wrap(),
     Switch: (props: Record<string, unknown>) =>
       R.createElement("label", null, R.createElement("input", { type: "checkbox" }), props.label),
     Tabs, Text: wrap(), TextInput: wrap(),

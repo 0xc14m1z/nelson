@@ -37,6 +37,7 @@ export interface ApiKey {
 export interface UserSettings {
   max_rounds: number | null;
   default_model_ids: string[];
+  summarizer_model_id: string | null;
 }
 
 export interface CustomModel {
@@ -165,6 +166,7 @@ export function useUpdateSettings() {
     mutationFn: async (settings: {
       max_rounds?: number | null;
       default_model_ids?: string[];
+      summarizer_model_id?: string | null;
     }) => {
       const resp = await apiFetch("/api/users/me/settings", {
         method: "PUT",

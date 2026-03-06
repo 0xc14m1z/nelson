@@ -22,6 +22,12 @@ export default function DashboardPage() {
           <Group justify="space-between">
             <Title order={2}>Dashboard</Title>
             <Group gap="xs">
+              <Button component={Link} href="/sessions" variant="light">
+                Sessions
+              </Button>
+              <Button component={Link} href="/sessions/new" variant="filled">
+                New Enquiry
+              </Button>
               <Button
                 component={Link}
                 href="/settings"
@@ -36,9 +42,6 @@ export default function DashboardPage() {
           </Group>
           <Text c="dimmed">
             Signed in as <strong>{user?.email}</strong>
-          </Text>
-          <Text size="sm" c="dimmed">
-            More features coming soon.
           </Text>
         </Stack>
       </Paper>

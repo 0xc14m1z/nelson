@@ -14,6 +14,7 @@ import {
   NumberInput,
   Paper,
   ScrollArea,
+  Select,
   Stack,
   Switch,
   Tabs,
@@ -669,6 +670,7 @@ function DefaultModelsTab() {
 
 function PreferencesTab() {
   const { data: settings, isLoading } = useUserSettings();
+  const { data: models = [], isLoading: modelsLoading } = useModels();
   const updateSettings = useUpdateSettings();
 
   // Track user edits separately; null = not yet edited by user
@@ -676,17 +678,40 @@ function PreferencesTab() {
     boolean | null
   >(null);
   const [editedMaxRounds, setEditedMaxRounds] = useState<number | null>(null);
+  const [editedSummarizerId, setEditedSummarizerId] = useState<string | null>(
+    null
+  );
 
   const serverUntilConsensus = settings?.max_rounds === null;
   const serverMaxRounds = settings?.max_rounds ?? 5;
 
   const untilConsensus = editedUntilConsensus ?? serverUntilConsensus ?? true;
   const maxRounds = editedMaxRounds ?? serverMaxRounds;
+  const summarizerId =
+    editedSummarizerId ?? settings?.summarizer_model_id ?? null;
+
+  // Build grouped select data for summarizer model dropdown
+  const grouped = new Map<string, typeof models>();
+  for (const model of models) {
+    const key = model.provider_slug;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(model);
+  }
+  const selectData = Array.from(grouped.entries()).map(
+    ([provider, providerModels]) => ({
+      group: provider,
+      items: providerModels.map((m) => ({
+        value: m.id,
+        label: m.display_name,
+      })),
+    })
+  );
 
   async function handleSave() {
     try {
       await updateSettings.mutateAsync({
         max_rounds: untilConsensus ? null : maxRounds,
+        summarizer_model_id: summarizerId,
       });
       notifications.show({
         title: "Saved",
@@ -702,7 +727,7 @@ function PreferencesTab() {
     }
   }
 
-  if (isLoading) {
+  if (isLoading || modelsLoading) {
     return <Text c="dimmed">Loading...</Text>;
   }
 
@@ -722,6 +747,16 @@ function PreferencesTab() {
         value={maxRounds}
         onChange={(val) => typeof val === "number" && setEditedMaxRounds(val)}
         disabled={untilConsensus}
+      />
+      <Select
+        label="Summarizer model"
+        description="Model used to summarize each round before critique. Defaults to GPT-4o Mini."
+        placeholder="GPT-4o Mini (default)"
+        data={selectData}
+        value={summarizerId}
+        onChange={setEditedSummarizerId}
+        clearable
+        searchable
       />
       <Button onClick={handleSave} loading={updateSettings.isPending}>
         Save Preferences
