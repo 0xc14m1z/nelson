@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Badge,
   Button,
   Checkbox,
   Container,
+  Divider,
   Group,
+  Loader,
   Modal,
   NumberInput,
   Paper,
+  ScrollArea,
   Stack,
   Switch,
   Tabs,
@@ -27,7 +30,12 @@ import {
   useDeleteKey,
   useValidateKey,
   useUpdateSettings,
+  useCustomModels,
+  useAddCustomModel,
+  useDeleteCustomModel,
+  useOpenRouterModels,
 } from "../../../lib/hooks";
+import type { CustomModel, OpenRouterModel } from "../../../lib/hooks";
 
 /* ─── API Keys Tab ─── */
 
@@ -228,18 +236,244 @@ function ApiKeysTab() {
   );
 }
 
+/* ─── Model Metadata ─── */
+
+function ModelMetadata({
+  model,
+}: {
+  model: {
+    model_type?: string | null;
+    input_price_per_mtok: string;
+    output_price_per_mtok: string;
+    context_window: number;
+    tokens_per_second?: number | null;
+  };
+}) {
+  return (
+    <Group gap="xs" mt={4}>
+      {model.model_type && (
+        <Badge
+          size="xs"
+          variant="light"
+          color={
+            model.model_type === "reasoning"
+              ? "violet"
+              : model.model_type === "hybrid"
+                ? "blue"
+                : model.model_type === "code"
+                  ? "green"
+                  : "gray"
+          }
+        >
+          {model.model_type}
+        </Badge>
+      )}
+      <Text size="xs" c="dimmed">
+        ${model.input_price_per_mtok}/${model.output_price_per_mtok} per M
+        tokens
+      </Text>
+      <Text size="xs" c="dimmed">
+        {(model.context_window / 1000).toFixed(0)}K ctx
+      </Text>
+      {model.tokens_per_second && (
+        <Text size="xs" c="dimmed">
+          {model.tokens_per_second} tok/s
+        </Text>
+      )}
+    </Group>
+  );
+}
+
+/* ─── Add from OpenRouter Modal ─── */
+
+function AddFromOpenRouterModal({
+  opened,
+  onClose,
+  hasOpenRouterKey,
+  customModelSlugs,
+}: {
+  opened: boolean;
+  onClose: () => void;
+  hasOpenRouterKey: boolean;
+  customModelSlugs: Set<string>;
+}) {
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addCustomModel = useAddCustomModel();
+
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 300);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [searchInput]);
+
+  function handleClose() {
+    setSearchInput("");
+    setDebouncedSearch("");
+    onClose();
+  }
+
+  const {
+    data: results = [],
+    isLoading,
+    isFetching,
+  } = useOpenRouterModels(debouncedSearch);
+
+  async function handleAdd(model: OpenRouterModel) {
+    try {
+      await addCustomModel.mutateAsync({
+        model_slug: model.slug,
+        display_name: model.display_name,
+        model_type: model.model_type,
+        input_price_per_mtok: model.input_price_per_mtok
+          ? parseFloat(model.input_price_per_mtok)
+          : null,
+        output_price_per_mtok: model.output_price_per_mtok
+          ? parseFloat(model.output_price_per_mtok)
+          : null,
+        context_window: model.context_window,
+        tokens_per_second: model.tokens_per_second,
+      });
+      notifications.show({
+        title: "Model added",
+        message: `${model.display_name} added to your custom models.`,
+        color: "green",
+      });
+    } catch (err) {
+      notifications.show({
+        title: "Error",
+        message:
+          err instanceof Error ? err.message : "Failed to add custom model",
+        color: "red",
+      });
+    }
+  }
+
+  if (!hasOpenRouterKey) {
+    return (
+      <Modal opened={opened} onClose={handleClose} title="Add from OpenRouter">
+        <Text c="dimmed">
+          Add an OpenRouter API key first to browse available models.
+        </Text>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal
+      opened={opened}
+      onClose={handleClose}
+      title="Add from OpenRouter"
+      size="lg"
+    >
+      <Stack>
+        <TextInput
+          placeholder="Search models (min 2 characters)..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.currentTarget.value)}
+        />
+
+        {(isLoading || isFetching) && debouncedSearch.length >= 2 && (
+          <Group justify="center" py="md">
+            <Loader size="sm" />
+          </Group>
+        )}
+
+        {debouncedSearch.length >= 2 &&
+          !isLoading &&
+          !isFetching &&
+          results.length === 0 && (
+            <Text c="dimmed" ta="center" py="md">
+              No models found.
+            </Text>
+          )}
+
+        {results.length > 0 && (
+          <ScrollArea.Autosize mah={400}>
+            <Stack gap="xs">
+              {results.map((model) => {
+                const alreadyAdded = customModelSlugs.has(model.slug);
+                return (
+                  <Paper key={model.slug} p="sm" radius="sm" withBorder>
+                    <Group justify="space-between" wrap="wrap">
+                      <Stack gap={2} style={{ flex: 1 }}>
+                        <Text size="sm" fw={500}>
+                          {model.display_name}
+                        </Text>
+                        <Group gap="xs">
+                          {model.model_type && (
+                            <Badge
+                              size="xs"
+                              variant="light"
+                              color={
+                                model.model_type === "reasoning"
+                                  ? "violet"
+                                  : model.model_type === "hybrid"
+                                    ? "blue"
+                                    : model.model_type === "code"
+                                      ? "green"
+                                      : "gray"
+                              }
+                            >
+                              {model.model_type}
+                            </Badge>
+                          )}
+                          {model.input_price_per_mtok &&
+                            model.output_price_per_mtok && (
+                              <Text size="xs" c="dimmed">
+                                ${model.input_price_per_mtok}/$
+                                {model.output_price_per_mtok} per M tokens
+                              </Text>
+                            )}
+                          {model.context_window && (
+                            <Text size="xs" c="dimmed">
+                              {(model.context_window / 1000).toFixed(0)}K ctx
+                            </Text>
+                          )}
+                        </Group>
+                      </Stack>
+                      <Button
+                        size="xs"
+                        variant="light"
+                        disabled={alreadyAdded || addCustomModel.isPending}
+                        onClick={() => handleAdd(model)}
+                      >
+                        {alreadyAdded ? "Added" : "Add"}
+                      </Button>
+                    </Group>
+                  </Paper>
+                );
+              })}
+            </Stack>
+          </ScrollArea.Autosize>
+        )}
+      </Stack>
+    </Modal>
+  );
+}
+
 /* ─── Default Models Tab ─── */
 
 function DefaultModelsTab() {
   const { data: models = [], isLoading: modelsLoading } = useModels();
   const { data: apiKeys = [], isLoading: keysLoading } = useApiKeys();
   const { data: settings, isLoading: settingsLoading } = useUserSettings();
+  const { data: customModels = [], isLoading: customModelsLoading } =
+    useCustomModels();
+  const deleteCustomModel = useDeleteCustomModel();
   const updateSettings = useUpdateSettings();
+
+  const [openRouterModalOpen, setOpenRouterModalOpen] = useState(false);
 
   // Track user edits separately; null = not yet edited by user
   const [editedModelIds, setEditedModelIds] = useState<string[] | null>(null);
 
-  if (modelsLoading || keysLoading || settingsLoading) {
+  if (modelsLoading || keysLoading || settingsLoading || customModelsLoading) {
     return <Text c="dimmed">Loading...</Text>;
   }
 
@@ -250,7 +484,7 @@ function DefaultModelsTab() {
   const hasOpenRouter = apiKeys.some((k) => k.provider_slug === "openrouter");
 
   const availableModels = models.filter(
-    (m) => keyProviderIds.has(m.provider_id) || hasOpenRouter
+    (m) => keyProviderIds.has(m.provider_id) || hasOpenRouter,
   );
 
   // Group by provider
@@ -259,6 +493,39 @@ function DefaultModelsTab() {
     const key = model.provider_slug;
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key)!.push(model);
+  }
+
+  const customModelSlugs = new Set(customModels.map((m) => m.slug));
+
+  function toggleModelId(modelId: string) {
+    const current = editedModelIds ?? settings?.default_model_ids ?? [];
+    if (current.includes(modelId)) {
+      setEditedModelIds(current.filter((id) => id !== modelId));
+    } else {
+      setEditedModelIds([...current, modelId]);
+    }
+  }
+
+  async function handleDeleteCustomModel(model: CustomModel) {
+    try {
+      // Remove from selection if selected
+      const current = editedModelIds ?? settings?.default_model_ids ?? [];
+      if (current.includes(model.id)) {
+        setEditedModelIds(current.filter((id) => id !== model.id));
+      }
+      await deleteCustomModel.mutateAsync(model.id);
+      notifications.show({
+        title: "Model removed",
+        message: `${model.display_name} removed from custom models.`,
+        color: "green",
+      });
+    } catch {
+      notifications.show({
+        title: "Error",
+        message: "Failed to remove custom model",
+        color: "red",
+      });
+    }
   }
 
   async function handleSave() {
@@ -280,7 +547,7 @@ function DefaultModelsTab() {
     }
   }
 
-  if (availableModels.length === 0) {
+  if (availableModels.length === 0 && customModels.length === 0) {
     return (
       <Text c="dimmed">
         Add an API key first to see available models.
@@ -290,30 +557,82 @@ function DefaultModelsTab() {
 
   return (
     <Stack gap="lg">
+      {/* Curated models grouped by provider */}
       {Array.from(grouped.entries()).map(([providerSlug, providerModels]) => (
         <Paper key={providerSlug} p="md" radius="md" withBorder>
           <Text fw={500} mb="sm" tt="capitalize">
             {providerModels[0]?.provider_slug}
           </Text>
-          <Checkbox.Group
-            value={selectedModelIds}
-            onChange={setEditedModelIds}
-          >
-            <Stack gap="xs">
-              {providerModels.map((model) => (
+          <Stack gap="xs">
+            {providerModels.map((model) => (
+              <div key={model.id}>
                 <Checkbox
-                  key={model.id}
-                  value={model.id}
+                  checked={selectedModelIds.includes(model.id)}
+                  onChange={() => toggleModelId(model.id)}
                   label={model.display_name}
                 />
-              ))}
-            </Stack>
-          </Checkbox.Group>
+                <ModelMetadata model={model} />
+              </div>
+            ))}
+          </Stack>
         </Paper>
       ))}
+
+      {/* Custom models section */}
+      {customModels.length > 0 && (
+        <>
+          <Divider label="Your custom models" labelPosition="center" />
+          <Paper p="md" radius="md" withBorder>
+            <Stack gap="xs">
+              {customModels.map((model) => (
+                <Group key={model.id} justify="space-between" wrap="wrap">
+                  <Stack gap={0} style={{ flex: 1 }}>
+                    <Group gap="xs">
+                      <Checkbox
+                        checked={selectedModelIds.includes(model.id)}
+                        onChange={() => toggleModelId(model.id)}
+                        label={model.display_name}
+                      />
+                      <Badge size="xs" variant="outline" color="teal">
+                        Custom
+                      </Badge>
+                    </Group>
+                    <ModelMetadata model={model} />
+                  </Stack>
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    color="red"
+                    onClick={() => handleDeleteCustomModel(model)}
+                    loading={deleteCustomModel.isPending}
+                  >
+                    Remove
+                  </Button>
+                </Group>
+              ))}
+            </Stack>
+          </Paper>
+        </>
+      )}
+
+      {/* Add from OpenRouter button */}
+      <Button
+        variant="light"
+        onClick={() => setOpenRouterModalOpen(true)}
+      >
+        Add from OpenRouter
+      </Button>
+
       <Button onClick={handleSave} loading={updateSettings.isPending}>
         Save Default Models
       </Button>
+
+      <AddFromOpenRouterModal
+        opened={openRouterModalOpen}
+        onClose={() => setOpenRouterModalOpen(false)}
+        hasOpenRouterKey={hasOpenRouter}
+        customModelSlugs={customModelSlugs}
+      />
     </Stack>
   );
 }
