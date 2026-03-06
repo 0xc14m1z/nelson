@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Badge,
   Button,
@@ -236,17 +236,14 @@ function DefaultModelsTab() {
   const { data: settings, isLoading: settingsLoading } = useUserSettings();
   const updateSettings = useUpdateSettings();
 
-  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (settings) {
-      setSelectedModelIds(settings.default_model_ids);
-    }
-  }, [settings]);
+  // Track user edits separately; null = not yet edited by user
+  const [editedModelIds, setEditedModelIds] = useState<string[] | null>(null);
 
   if (modelsLoading || keysLoading || settingsLoading) {
     return <Text c="dimmed">Loading...</Text>;
   }
+
+  const selectedModelIds = editedModelIds ?? settings?.default_model_ids ?? [];
 
   // Only show models where user has a key for that provider or has OpenRouter key
   const keyProviderIds = new Set(apiKeys.map((k) => k.provider_id));
@@ -300,7 +297,7 @@ function DefaultModelsTab() {
           </Text>
           <Checkbox.Group
             value={selectedModelIds}
-            onChange={setSelectedModelIds}
+            onChange={setEditedModelIds}
           >
             <Stack gap="xs">
               {providerModels.map((model) => (
@@ -327,16 +324,17 @@ function PreferencesTab() {
   const { data: settings, isLoading } = useUserSettings();
   const updateSettings = useUpdateSettings();
 
-  const [untilConsensus, setUntilConsensus] = useState(true);
-  const [maxRounds, setMaxRounds] = useState<number>(5);
+  // Track user edits separately; null = not yet edited by user
+  const [editedUntilConsensus, setEditedUntilConsensus] = useState<
+    boolean | null
+  >(null);
+  const [editedMaxRounds, setEditedMaxRounds] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (settings) {
-      const isNull = settings.max_rounds === null;
-      setUntilConsensus(isNull);
-      if (!isNull) setMaxRounds(settings.max_rounds!);
-    }
-  }, [settings]);
+  const serverUntilConsensus = settings?.max_rounds === null;
+  const serverMaxRounds = settings?.max_rounds ?? 5;
+
+  const untilConsensus = editedUntilConsensus ?? serverUntilConsensus ?? true;
+  const maxRounds = editedMaxRounds ?? serverMaxRounds;
 
   async function handleSave() {
     try {
@@ -367,7 +365,7 @@ function PreferencesTab() {
         label="Until consensus"
         description="When enabled, rounds continue until all models agree."
         checked={untilConsensus}
-        onChange={(e) => setUntilConsensus(e.currentTarget.checked)}
+        onChange={(e) => setEditedUntilConsensus(e.currentTarget.checked)}
       />
       <NumberInput
         label="Maximum rounds"
@@ -375,7 +373,7 @@ function PreferencesTab() {
         min={2}
         max={20}
         value={maxRounds}
-        onChange={(val) => typeof val === "number" && setMaxRounds(val)}
+        onChange={(val) => typeof val === "number" && setEditedMaxRounds(val)}
         disabled={untilConsensus}
       />
       <Button onClick={handleSave} loading={updateSettings.isPending}>
