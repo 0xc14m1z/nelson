@@ -258,6 +258,21 @@ def upgrade() -> None:
     )
 
     # --- Seed data: replace old models with 2026 frontier models ---
+    # Clear tables that may reference llm_models (from consensus branch, if already applied)
+    conn = op.get_bind()
+    for table in ("llm_calls", "session_models"):
+        result = conn.execute(sa.text(
+            "SELECT 1 FROM information_schema.tables WHERE table_name = :t"
+        ), {"t": table})
+        if result.scalar():
+            conn.execute(sa.text(f"DELETE FROM {table}"))
+    # Null out summarizer_model_id FK if user_settings has it
+    result = conn.execute(sa.text(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_name = 'user_settings' AND column_name = 'summarizer_model_id'"
+    ))
+    if result.scalar():
+        conn.execute(sa.text("UPDATE user_settings SET summarizer_model_id = NULL"))
     op.execute("DELETE FROM user_default_models")
     op.execute("DELETE FROM llm_models")
 
