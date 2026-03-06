@@ -88,6 +88,9 @@ class ConsensusOrchestrator:
             start_time = time.monotonic()
 
             try:
+                # Wait for at least one SSE client before starting
+                await self.broadcast.wait_for_subscriber(timeout=5.0)
+
                 # Round 1: Initial responses
                 session.status = "responding"
                 session.current_round = 1
@@ -184,7 +187,14 @@ class ConsensusOrchestrator:
                 # Push terminal event
                 self.broadcast.push(StreamEvent(
                     event=session.status,
-                    data={"status": session.status},
+                    data={
+                        "status": session.status,
+                        "current_round": session.current_round,
+                        "total_input_tokens": session.total_input_tokens,
+                        "total_output_tokens": session.total_output_tokens,
+                        "total_cost": float(session.total_cost),
+                        "total_duration_ms": session.total_duration_ms,
+                    },
                 ))
 
             except Exception:
@@ -599,7 +609,14 @@ class ConsensusOrchestrator:
         await db.commit()
         self.broadcast.push(StreamEvent(
             event="failed",
-            data={"status": "failed"},
+            data={
+                "status": "failed",
+                "current_round": session.current_round,
+                "total_input_tokens": session.total_input_tokens,
+                "total_output_tokens": session.total_output_tokens,
+                "total_cost": float(session.total_cost),
+                "total_duration_ms": session.total_duration_ms,
+            },
         ))
 
     async def _update_session_totals(

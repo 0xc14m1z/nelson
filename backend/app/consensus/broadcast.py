@@ -56,6 +56,7 @@ class Broadcast:
         self._consumers: list[_Consumer] = []
         self._text_buffers: dict[str, str] = {}
         self._closed = False
+        self._subscriber_event = asyncio.Event()
 
     # ── consumer management ──────────────────────────────────────────
 
@@ -65,7 +66,18 @@ class Broadcast:
             raise RuntimeError("Broadcast is closed")
         consumer = _Consumer()
         self._consumers.append(consumer)
+        self._subscriber_event.set()
         return consumer
+
+    async def wait_for_subscriber(self, timeout: float = 5.0) -> bool:
+        """Wait until at least one consumer subscribes, or timeout."""
+        if self._consumers:
+            return True
+        try:
+            await asyncio.wait_for(self._subscriber_event.wait(), timeout)
+            return True
+        except TimeoutError:
+            return False
 
     def unsubscribe(self, consumer: _Consumer) -> None:
         """Remove a consumer and signal it to stop."""

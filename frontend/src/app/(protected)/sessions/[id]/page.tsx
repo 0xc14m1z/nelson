@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { Fragment, useMemo } from "react";
 import { useParams } from "next/navigation";
 import {
   Box,
+  Divider,
   Loader,
   Paper,
   Stack,
@@ -12,10 +13,9 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { ConsensusBanner } from "@/components/consensus/ConsensusBanner";
-import { PhaseDivider } from "@/components/consensus/PhaseDivider";
 import { StreamingColumn } from "@/components/consensus/StreamingColumn";
 import { useConsensusStream } from "@/hooks/useConsensusStream";
-import type { ModelStreamState, PhaseInfo } from "@/hooks/useConsensusStream";
+import type { ModelStreamState } from "@/hooks/useConsensusStream";
 import type { SessionSummary } from "@/types/session";
 
 /* ------------------------------------------------------------------ */
@@ -56,17 +56,10 @@ interface CatalogModel {
 /*  State reconstruction from API data                                */
 /* ------------------------------------------------------------------ */
 
-interface ReconstructedState {
-  models: Map<string, ModelStreamState>;
-  phases: PhaseInfo[];
-}
-
-function buildStateFromCalls(
+function buildModelsFromCalls(
   llmCalls: SessionDetail["llm_calls"],
-  modelNames: Map<string, string>,
-): ReconstructedState {
+): Map<string, ModelStreamState> {
   const models = new Map<string, ModelStreamState>();
-  const roundsMap = new Map<number, Map<string, SessionDetail["llm_calls"][0]>>();
 
   for (const call of llmCalls) {
     if (call.role === "summarizer") continue;
@@ -90,37 +83,28 @@ function buildStateFromCalls(
       cost: call.cost,
       duration_ms: call.duration_ms,
     });
-
-    if (!roundsMap.has(call.round_number)) {
-      roundsMap.set(call.round_number, new Map());
-    }
-    roundsMap.get(call.round_number)!.set(call.llm_model_id, call);
   }
 
-  const phases: PhaseInfo[] = [...roundsMap.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([roundNum, callsMap]) => {
-      const calls = [...callsMap.values()];
-      const role = calls[0]?.role ?? "responder";
-      return {
-        round_number: roundNum,
-        phase: role === "responder" ? "responder_done" : "critic_done",
-        models: calls
-          .filter((c) => !c.error)
-          .map((c) => ({
-            llm_model_id: c.llm_model_id,
-            model_name: modelNames.get(c.llm_model_id) ?? `${c.provider_slug}/${c.model_slug}`,
-            ...(c.confidence != null ? { confidence: c.confidence } : {}),
-            ...(c.key_points != null ? { key_points: c.key_points } : {}),
-            ...(c.has_disagreements != null ? { has_disagreements: c.has_disagreements } : {}),
-            ...(c.disagreements != null ? { disagreements: c.disagreements } : {}),
-          })),
-        roundSummary: null,
-        collapsed: true,
-      };
-    });
+  return models;
+}
 
-  return { models, phases };
+/* ------------------------------------------------------------------ */
+/*  Helper: group models by round and compute per-round done state    */
+/* ------------------------------------------------------------------ */
+
+function groupByRound(models: Map<string, ModelStreamState>) {
+  const rounds = new Map<number, Array<{ key: string; model: ModelStreamState }>>();
+  for (const [key, model] of models) {
+    const arr = rounds.get(model.round_number) ?? [];
+    arr.push({ key, model });
+    rounds.set(model.round_number, arr);
+  }
+  return [...rounds.entries()].sort(([a], [b]) => a - b);
+}
+
+function roundLabel(roundNumber: number, role: string) {
+  if (role === "critic") return `Round ${roundNumber} — Critique`;
+  return `Round ${roundNumber} — Initial Responses`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -130,7 +114,6 @@ function buildStateFromCalls(
 export default function SessionPage() {
   const { id } = useParams<{ id: string }>();
 
-  // Fetch session metadata (summary for live, detail for completed)
   const { data: session } = useQuery<SessionDetail>({
     queryKey: ["session", id],
     queryFn: async () => {
@@ -143,7 +126,6 @@ export default function SessionPage() {
     session?.status || "",
   );
 
-  // Fetch all models for name resolution
   const { data: catalogModels } = useQuery<CatalogModel[]>({
     queryKey: ["models"],
     queryFn: async () => {
@@ -164,131 +146,18 @@ export default function SessionPage() {
 
   // Stream events (only when session is not terminal)
   const stream = useConsensusStream({ sessionId: id, enabled: !isTerminal });
-  const streamModels = stream.models;
-
-  // Derive current round from models map
-  const currentRound = useMemo(() => {
-    let max = 1;
-    for (const model of streamModels.values()) {
-      if (model.round_number > max) max = model.round_number;
-    }
-    return max;
-  }, [streamModels]);
-
-  // Current round models (for live streaming columns)
-  const currentRoundModels = useMemo(() => {
-    const entries: Array<{
-      key: string;
-      model: (typeof streamModels extends Map<string, infer V> ? V : never);
-    }> = [];
-    for (const [key, model] of streamModels) {
-      if (model.round_number === currentRound) {
-        entries.push({ key, model });
-      }
-    }
-    return entries;
-  }, [streamModels, currentRound]);
-
-  const allCurrentDone = useMemo(() => {
-    if (currentRoundModels.length === 0) return false;
-    return currentRoundModels.every((e) => e.model.isDone);
-  }, [currentRoundModels]);
 
   // Reconstruct state from API data for completed sessions
-  const reconstructed = useMemo(() => {
+  const reconstructedModels = useMemo(() => {
     if (!isTerminal || !session) return null;
-    return buildStateFromCalls(session.llm_calls, modelNames);
-  }, [isTerminal, session, modelNames]);
+    return buildModelsFromCalls(session.llm_calls);
+  }, [isTerminal, session]);
 
-  const [collapsedPhases, setCollapsedPhases] = useState<Record<number, boolean>>({});
+  // Pick the models map: reconstructed for completed, stream for live
+  const modelsMap = isTerminal && reconstructedModels ? reconstructedModels : stream.models;
+  const rounds = useMemo(() => groupByRound(modelsMap), [modelsMap]);
 
-  const completedPhases = useMemo(() => {
-    if (!reconstructed) return [];
-    return reconstructed.phases.map((p, i) => ({
-      ...p,
-      collapsed: collapsedPhases[i] ?? true,
-    }));
-  }, [reconstructed, collapsedPhases]);
-
-  const toggleCompletedPhase = useCallback((index: number) => {
-    setCollapsedPhases((prev) => ({ ...prev, [index]: !(prev[index] ?? true) }));
-  }, []);
-
-  /* ---------- Terminal: completed session view ---------- */
-  if (isTerminal && session && reconstructed) {
-    // All phases except the last are shown as PhaseDividers (collapsed)
-    // The last round's models are shown as StreamingColumns
-    const allPhases = completedPhases;
-    const pastPhases = allPhases.slice(0, -1);
-    const lastPhase = allPhases[allPhases.length - 1];
-
-    // Get the last round's models from the reconstructed map
-    const lastRoundModels: Array<{ key: string; model: ModelStreamState }> = [];
-    if (lastPhase) {
-      for (const [key, model] of reconstructed.models) {
-        if (model.round_number === lastPhase.round_number) {
-          lastRoundModels.push({ key, model });
-        }
-      }
-    }
-
-    return (
-      <Stack gap="md">
-        {/* Enquiry header */}
-        <Paper p="sm" radius="md" withBorder>
-          <Text size="xs" c="dimmed" fw={600}>
-            You
-          </Text>
-          <Text size="sm">{session.enquiry}</Text>
-        </Paper>
-
-        {/* Past phases as PhaseDividers */}
-        {pastPhases.map((phase, index) => (
-          <PhaseDivider
-            key={index}
-            phase={phase}
-            modelNames={modelNames}
-            onToggle={() => toggleCompletedPhase(index)}
-          />
-        ))}
-
-        {/* Last round's models as StreamingColumns */}
-        {lastRoundModels.length > 0 && (
-          <Box
-            style={{
-              display: "flex",
-              gap: 12,
-              overflowX: "auto",
-            }}
-          >
-            {lastRoundModels.map(({ key, model }) => (
-              <StreamingColumn
-                key={key}
-                model={model}
-                displayName={modelNames.get(model.llm_model_id) ?? model.llm_model_id}
-                allModelsDone={true}
-              />
-            ))}
-          </Box>
-        )}
-
-        {/* Terminal banner */}
-        <ConsensusBanner
-          type={session.status as "consensus_reached" | "max_rounds_reached" | "failed"}
-          event={{
-            status: session.status,
-            current_round: session.current_round,
-            total_input_tokens: session.total_input_tokens,
-            total_output_tokens: session.total_output_tokens,
-            total_cost: session.total_cost,
-            total_duration_ms: session.total_duration_ms,
-          }}
-        />
-      </Stack>
-    );
-  }
-
-  /* ---------- Live: streaming view ---------- */
+  /* ---------- Shared render for both live and completed ---------- */
   return (
     <Stack gap="md">
       {/* Enquiry header */}
@@ -301,38 +170,45 @@ export default function SessionPage() {
         </Paper>
       )}
 
-      {/* Completed phases (past rounds) */}
-      {stream.phases.map((phase, index) => (
-        <PhaseDivider
-          key={index}
-          phase={phase}
-          modelNames={modelNames}
-          onToggle={() => stream.togglePhase(index)}
-        />
-      ))}
+      {/* All rounds, each with columns */}
+      {rounds.map(([roundNum, entries], roundIndex) => {
+        const allDone = entries.every((e) => e.model.isDone);
+        const role = entries[0]?.model.role ?? "responder";
 
-      {/* Current round streaming columns */}
-      {currentRoundModels.length > 0 && (
-        <Box
-          style={{
-            display: "flex",
-            gap: 12,
-            overflowX: "auto",
-          }}
-        >
-          {currentRoundModels.map(({ key, model }) => (
-            <StreamingColumn
-              key={key}
-              model={model}
-              displayName={modelNames.get(model.llm_model_id) ?? model.llm_model_id}
-              allModelsDone={allCurrentDone}
-            />
-          ))}
-        </Box>
-      )}
+        return (
+          <Fragment key={roundNum}>
+            {/* Divider between rounds */}
+            {roundIndex > 0 && (
+              <Divider
+                label={roundLabel(roundNum, role)}
+                labelPosition="center"
+                my="xs"
+              />
+            )}
 
-      {/* Loading indicator */}
-      {stream.isConnected && currentRoundModels.length === 0 && (
+            {/* Columns for this round */}
+            <Box
+              style={{
+                display: "flex",
+                gap: 12,
+                overflowX: "auto",
+              }}
+            >
+              {entries.map(({ key, model }) => (
+                <StreamingColumn
+                  key={key}
+                  model={model}
+                  displayName={modelNames.get(model.llm_model_id) ?? model.llm_model_id}
+                  allModelsDone={allDone}
+                />
+              ))}
+            </Box>
+          </Fragment>
+        );
+      })}
+
+      {/* Loading indicator (live only) */}
+      {!isTerminal && stream.isConnected && rounds.length === 0 && (
         <Box ta="center" py="md">
           <Loader size="sm" />
           <Text size="xs" c="dimmed" mt={4}>
@@ -342,7 +218,20 @@ export default function SessionPage() {
       )}
 
       {/* Terminal banner */}
-      {stream.terminalEvent && (
+      {isTerminal && session && (
+        <ConsensusBanner
+          type={session.status as "consensus_reached" | "max_rounds_reached" | "failed"}
+          event={{
+            status: session.status,
+            current_round: session.current_round,
+            total_input_tokens: session.total_input_tokens,
+            total_output_tokens: session.total_output_tokens,
+            total_cost: session.total_cost,
+            total_duration_ms: session.total_duration_ms,
+          }}
+        />
+      )}
+      {!isTerminal && stream.terminalEvent && (
         <ConsensusBanner
           type={stream.status as "consensus_reached" | "max_rounds_reached" | "failed"}
           event={stream.terminalEvent}
