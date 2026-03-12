@@ -4,6 +4,7 @@ from pydantic import BaseModel, model_validator
 
 from nelson.protocols.domain import ErrorObject, UsageSnapshot
 from nelson.protocols.enums import (
+    Adapter,
     CandidateSource,
     EventType,
     InvocationPurpose,
@@ -22,7 +23,7 @@ from nelson.protocols.enums import (
 
 class CommandReceivedPayload(BaseModel):
     command_type: str
-    adapter: str
+    adapter: Adapter
 
 
 class CommandCompletedPayload(BaseModel):

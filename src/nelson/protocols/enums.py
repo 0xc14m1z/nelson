@@ -146,6 +146,10 @@ class OutputFormat(StrEnum):
     STRUCTURED = "structured"
 
 
+class Adapter(StrEnum):
+    CLI = "cli"
+
+
 class UsageScope(StrEnum):
     INVOCATION = "invocation"
     RUN_TOTAL = "run_total"

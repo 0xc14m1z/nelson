@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
-from nelson.protocols.enums import CommandType, InputSource, ReleaseGateMode
+from nelson.protocols.enums import Adapter, CommandType, InputSource, ReleaseGateMode
 
 
 def _utc_now() -> datetime:
@@ -15,7 +15,7 @@ class AuthSetCommand(BaseModel):
     command_id: str
     type: CommandType = CommandType.AUTH_SET
     issued_at: datetime = Field(default_factory=_utc_now)
-    adapter: str = "cli"
+    adapter: Adapter = Adapter.CLI
     api_key: str
 
 
@@ -23,21 +23,21 @@ class AuthStatusCommand(BaseModel):
     command_id: str
     type: CommandType = CommandType.AUTH_STATUS
     issued_at: datetime = Field(default_factory=_utc_now)
-    adapter: str = "cli"
+    adapter: Adapter = Adapter.CLI
 
 
 class AuthClearCommand(BaseModel):
     command_id: str
     type: CommandType = CommandType.AUTH_CLEAR
     issued_at: datetime = Field(default_factory=_utc_now)
-    adapter: str = "cli"
+    adapter: Adapter = Adapter.CLI
 
 
 class RunCommand(BaseModel):
     command_id: str
     type: CommandType = CommandType.RUN
     issued_at: datetime = Field(default_factory=_utc_now)
-    adapter: str = "cli"
+    adapter: Adapter = Adapter.CLI
     input_source: InputSource
     prompt_text: str
     participants: list[str]
