@@ -4,6 +4,8 @@ from enum import StrEnum
 
 
 class Phase(StrEnum):
+    """Pipeline phase in which an event occurs."""
+
     COMMAND = "command"
     AUTH = "auth"
     STARTUP = "startup"
@@ -17,12 +19,16 @@ class Phase(StrEnum):
 
 
 class Role(StrEnum):
+    """Actor role that produced an event."""
+
     SYSTEM = "system"
     PARTICIPANT = "participant"
     MODERATOR = "moderator"
 
 
 class EventType(StrEnum):
+    """Discriminator for all application event types."""
+
     COMMAND_RECEIVED = "command_received"
     COMMAND_COMPLETED = "command_completed"
     COMMAND_FAILED = "command_failed"
@@ -56,6 +62,8 @@ class EventType(StrEnum):
 
 
 class InvocationPurpose(StrEnum):
+    """Why a model invocation was made."""
+
     TASK_FRAMING = "task_framing"
     INITIAL_CONTRIBUTION = "initial_contribution"
     REFRAMED_CONTRIBUTION = "reframed_contribution"
@@ -66,6 +74,8 @@ class InvocationPurpose(StrEnum):
 
 
 class CommandType(StrEnum):
+    """Application command discriminator."""
+
     AUTH_SET = "auth_set"
     AUTH_STATUS = "auth_status"
     AUTH_CLEAR = "auth_clear"
@@ -73,12 +83,16 @@ class CommandType(StrEnum):
 
 
 class InputSource(StrEnum):
+    """How the user's prompt was provided."""
+
     PROMPT = "prompt"
     PROMPT_FILE = "prompt_file"
     STDIN = "stdin"
 
 
 class TaskType(StrEnum):
+    """Category assigned to the user's task by the moderator."""
+
     FACTUAL = "factual"
     COMPARATIVE = "comparative"
     ANALYTICAL = "analytical"
@@ -91,18 +105,24 @@ class TaskType(StrEnum):
 
 
 class Sensitivity(StrEnum):
+    """Content sensitivity level determined by the moderator."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
 
 
 class FramingFeedbackStatus(StrEnum):
+    """Participant's assessment of the task framing."""
+
     ACCEPT = "accept"
     MINOR_ISSUE = "minor_issue"
     MAJOR_ISSUE = "major_issue"
 
 
 class ReviewDecision(StrEnum):
+    """Participant's verdict on a candidate answer."""
+
     APPROVE = "approve"
     MINOR_REVISE = "minor_revise"
     MAJOR_REVISE = "major_revise"
@@ -110,24 +130,32 @@ class ReviewDecision(StrEnum):
 
 
 class RunStatus(StrEnum):
+    """Terminal status of a consensus run."""
+
     SUCCESS = "success"
     PARTIAL = "partial"
     FAILED = "failed"
 
 
 class ConsensusStatus(StrEnum):
+    """Outcome of the consensus process."""
+
     REACHED = "reached"
     PARTIAL = "partial"
     FAILED = "failed"
 
 
 class ReleaseGateMode(StrEnum):
+    """Controls whether the moderator performs a final quality check."""
+
     OFF = "off"
     AUTO = "auto"
     ON = "on"
 
 
 class ReleaseGateDecision(StrEnum):
+    """Moderator's final quality-gate verdict."""
+
     SKIPPED = "skipped"
     PASS = "pass"
     PASS_WITH_MINOR_FIXES = "pass_with_minor_fixes"
@@ -135,6 +163,8 @@ class ReleaseGateDecision(StrEnum):
 
 
 class CandidateSource(StrEnum):
+    """How a candidate answer was produced."""
+
     INITIAL_SYNTHESIS = "initial_synthesis"
     MAJOR_REVISE_CYCLE = "major_revise_cycle"
     MINOR_REVISE_INCORPORATION = "minor_revise_incorporation"
@@ -142,14 +172,20 @@ class CandidateSource(StrEnum):
 
 
 class OutputFormat(StrEnum):
+    """Format of a model invocation's output."""
+
     TEXT = "text"
     STRUCTURED = "structured"
 
 
 class Adapter(StrEnum):
+    """Interface that originated a command."""
+
     CLI = "cli"
 
 
 class UsageScope(StrEnum):
+    """Granularity of a usage report."""
+
     INVOCATION = "invocation"
     RUN_TOTAL = "run_total"
