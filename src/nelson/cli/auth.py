@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from pydantic import ValidationError
 
 from nelson.cli.exit_codes import ExitCode
 from nelson.core.dispatcher import AuthCommandExecution, dispatch
@@ -40,7 +41,11 @@ def set_key(
     api_key: Annotated[str, typer.Option("--api-key", help="OpenRouter API key to save")],
 ) -> None:
     """Save an OpenRouter API key."""
-    cmd = AuthSetCommand(api_key=api_key)
+    try:
+        cmd = AuthSetCommand(api_key=api_key)
+    except ValidationError:
+        typer.echo("API key must not be empty.", err=True)
+        raise typer.Exit(code=ExitCode.INVALID_USAGE)
     result = asyncio.run(_drain_and_result(dispatch(cmd, config_dir=_config_dir())))
 
     if isinstance(result, AuthSetResult) and result.saved:

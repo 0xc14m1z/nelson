@@ -26,6 +26,13 @@ def test_auth_set_missing_key_exits_2() -> None:
     assert result.exit_code == ExitCode.INVALID_USAGE
 
 
+def test_auth_set_empty_key_exits_2() -> None:
+    """Empty --api-key value should exit with code 2."""
+    result = runner.invoke(app, ["auth", "set", "--api-key", ""])
+    assert result.exit_code == ExitCode.INVALID_USAGE
+    assert "empty" in result.output.lower()
+
+
 def test_auth_status_no_key_exits_3(tmp_home: Path) -> None:
     """T-AUTH-002: `auth status` with no key should exit 3."""
     result = runner.invoke(app, ["auth", "status"])

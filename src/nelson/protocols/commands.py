@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from nelson.protocols.enums import Adapter, CommandType, InputSource, ReleaseGateMode
 
@@ -32,6 +32,14 @@ class AuthSetCommand(BaseModel):
         default=Adapter.CLI, description="Interface that originated the command."
     )
     api_key: str = Field(description="OpenRouter API key to save.")
+
+    @field_validator("api_key")
+    @classmethod
+    def api_key_must_not_be_empty(cls, v: str) -> str:
+        """Reject empty or whitespace-only keys (CLI_SPEC §5.1)."""
+        if not v.strip():
+            raise ValueError("API key must not be empty")
+        return v
 
 
 class AuthStatusCommand(BaseModel):

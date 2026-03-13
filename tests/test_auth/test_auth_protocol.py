@@ -3,6 +3,9 @@
 import os
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from nelson.core.dispatcher import AuthCommandExecution, dispatch
 from nelson.protocols.commands import AuthClearCommand, AuthSetCommand, AuthStatusCommand
 from nelson.protocols.enums import ErrorCode
@@ -119,3 +122,32 @@ async def test_auth_clear_emits_command_failed_on_unwritable_dir(tmp_home: Path)
 
     # Restore permissions so tmp_path cleanup succeeds
     os.chmod(config_dir, 0o755)
+
+
+# ── Validation tests ────────────────────────────────────────────────────
+
+
+def test_auth_set_rejects_empty_api_key() -> None:
+    """AuthSetCommand rejects empty string as api_key."""
+    with pytest.raises(ValidationError, match="API key must not be empty"):
+        AuthSetCommand(api_key="")
+
+
+def test_auth_set_rejects_whitespace_only_api_key() -> None:
+    """AuthSetCommand rejects whitespace-only string as api_key."""
+    with pytest.raises(ValidationError, match="API key must not be empty"):
+        AuthSetCommand(api_key="   ")
+
+
+# ── Event stream identity tests ─────────────────────────────────────────
+
+
+async def test_events_property_returns_same_iterator(tmp_home: Path) -> None:
+    """Accessing .events multiple times returns the same iterator, not a new execution."""
+    cmd = AuthSetCommand(command_id="cmd_test_identity", api_key="sk-test")
+    execution = dispatch(cmd, config_dir=tmp_home / ".nelson")
+
+    # Both accesses must return the exact same iterator object
+    first = execution.events
+    second = execution.events
+    assert first is second

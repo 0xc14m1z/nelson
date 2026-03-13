@@ -80,11 +80,20 @@ class AuthCommandExecution:
         self._command = command
         self._config_dir = config_dir
         self._result: CommandResult | None = None
+        # Cached so that accessing .events multiple times returns the same
+        # iterator rather than re-executing the side-effecting command.
+        self._events: AsyncIterator[ApplicationEvent] | None = None
 
     @property
     def events(self) -> AsyncIterator[ApplicationEvent]:
-        """Async stream of events emitted during execution."""
-        return self._execute()
+        """Async stream of events emitted during execution.
+
+        Returns the same iterator on every access — the command is
+        executed exactly once per ``AuthCommandExecution`` instance.
+        """
+        if self._events is None:
+            self._events = self._execute()
+        return self._events
 
     async def result(self) -> CommandResult | None:
         """Terminal result after event stream is drained."""
