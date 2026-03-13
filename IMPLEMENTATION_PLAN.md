@@ -562,7 +562,7 @@ External prompt files are intentionally deferred to future work.
 - async-first runtime
 - `uv` for project and environment workflow
 - `Typer` for CLI
-- `httpx` for async HTTP and streaming
+- `openai` (Python SDK) for OpenRouter API calls via base URL redirect
 - `pydantic` for typed models and schema export
 
 Optional but likely useful:

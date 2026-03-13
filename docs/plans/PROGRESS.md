@@ -67,9 +67,9 @@ PR #2. 69 tests (28 new auth tests).
 
 - `Provider` Protocol with `invoke()` (non-streaming) and `stream()` (SSE streaming)
 - `FakeProvider` with queued responses, stream deltas, and error simulation for all failure modes
-- `OpenRouterProvider` with httpx: non-streaming invoke, lazy SSE streaming via `_LazyOpenRouterStream`
+- `OpenRouterProvider` using the OpenAI Python SDK (`AsyncOpenAI` with `base_url` pointed at OpenRouter). SDK handles SSE parsing, typed response models, and connection lifecycle. Hidden retries disabled (`max_retries=0`) per §6.3.
 - Domain error hierarchy: `NelsonError` base → `ProviderTimeoutError`, `ProviderTransportError`, `ProviderAuthError`, `StructuredOutputInvalidError`
 - Each error maps to `ErrorCode` enum via class attribute
+- SDK exceptions (`AuthenticationError`, `APITimeoutError`, `APIConnectionError`, `APIStatusError`) translated to domain errors via `_translate_error()`
 - Merged `_ErrorStream` into `FakeStream` (simplify review)
-- Extracted `_auth_headers()` helper to eliminate header duplication
-- Type-safe usage extraction with `isinstance` guards (no `type: ignore`)
+- Removed trivial `test_core/test_errors.py` — error types are tested through provider and orchestration tests

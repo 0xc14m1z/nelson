@@ -357,7 +357,7 @@ Make it possible to send prompts to real LLMs through OpenRouter. Establish the 
 
 - `src/nelson/providers/base.py` — provider Protocol interface
 - `src/nelson/providers/fake.py` — deterministic fake provider
-- `src/nelson/providers/openrouter.py` — OpenRouter implementation (httpx, SSE parsing, usage extraction, timeout)
+- `src/nelson/providers/openrouter.py` — OpenRouter implementation (OpenAI SDK via `base_url` redirect, usage extraction, timeout)
 - `src/nelson/core/errors.py` — domain exception types
 
 #### Dependencies on earlier phases
