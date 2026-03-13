@@ -55,6 +55,10 @@ Normative specifications:
 - [`docs/PROMPT_SPEC.md`](./docs/PROMPT_SPEC.md)
 - [`docs/ACCEPTANCE_TESTS.md`](./docs/ACCEPTANCE_TESTS.md)
 
+Visual flow reference:
+
+- [`docs/FLOWS.md`](./docs/FLOWS.md)
+
 Engineering and tooling:
 
 - [`docs/PYTHON_ENGINEERING_STANDARDS.md`](./docs/PYTHON_ENGINEERING_STANDARDS.md)
