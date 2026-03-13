@@ -1,4 +1,11 @@
-"""Application protocol dispatcher for auth commands."""
+"""Application protocol dispatcher for auth commands.
+
+Implements the CommandExecution protocol (APPLICATION_PROTOCOL §3):
+one typed command in → one ordered event stream out → one typed result out.
+
+Event ordering follows APPLICATION_PROTOCOL §9-10:
+  command_received → one auth domain event → command_completed
+"""
 
 import os
 from collections.abc import AsyncIterator
@@ -40,7 +47,11 @@ def _make_event(
     phase: Phase,
     payload: EventPayload,
 ) -> ApplicationEvent:
-    """Build an ApplicationEvent with standard envelope fields."""
+    """Build an ApplicationEvent with standard envelope fields.
+
+    Auth events are always emitted by the system role (not a participant
+    or moderator), so role is hardcoded to SYSTEM.
+    """
     return ApplicationEvent(
         event_id=f"evt_{command_id}_{sequence}",
         command_id=command_id,
@@ -58,6 +69,9 @@ class AuthCommandExecution:
 
     Produces a stream of typed events and a terminal result for
     ``AuthSetCommand``, ``AuthStatusCommand``, and ``AuthClearCommand``.
+
+    The result is populated as a side-effect of iterating the event stream.
+    Callers must drain ``.events`` before calling ``.result()``.
     """
 
     def __init__(self, command: AuthCommand, *, config_dir: Path | None = None) -> None:
@@ -75,11 +89,17 @@ class AuthCommandExecution:
         return self._result
 
     async def _execute(self) -> AsyncIterator[ApplicationEvent]:
-        """Generate the event stream for an auth command."""
+        """Generate the event stream for an auth command.
+
+        Every auth command produces exactly 3 events:
+        1. command_received (APPLICATION_PROTOCOL §9 — always first)
+        2. One domain event (auth_key_saved / auth_status_reported / auth_key_cleared)
+        3. command_completed (APPLICATION_PROTOCOL §9 — always last)
+        """
         cmd = self._command
         seq = 1
 
-        # command_received
+        # Event 1: acknowledge receipt of the command
         yield _make_event(
             cmd.command_id,
             seq,
@@ -89,6 +109,7 @@ class AuthCommandExecution:
         )
         seq += 1
 
+        # Event 2: execute the command and emit the domain event
         if isinstance(cmd, AuthSetCommand):
             event, self._result = self._handle_auth_set(cmd, seq)
             yield event
@@ -102,7 +123,7 @@ class AuthCommandExecution:
             yield event
             seq += 1
 
-        # command_completed
+        # Event 3: mark the command as completed
         yield _make_event(
             cmd.command_id,
             seq,
@@ -114,7 +135,7 @@ class AuthCommandExecution:
     def _handle_auth_set(
         self, cmd: AuthSetCommand, seq: int
     ) -> tuple[ApplicationEvent, AuthSetResult]:
-        """Handle AuthSetCommand — save key, return event and result."""
+        """Handle AuthSetCommand — save key to disk."""
         path = save_key(cmd.api_key, config_dir=self._config_dir)
         event = _make_event(
             cmd.command_id,
@@ -129,13 +150,19 @@ class AuthCommandExecution:
     def _handle_auth_status(
         self, cmd: AuthStatusCommand, seq: int
     ) -> tuple[ApplicationEvent, AuthStatusResult]:
-        """Handle AuthStatusCommand — check key sources and report."""
+        """Handle AuthStatusCommand — check which key sources are available.
+
+        Determines effective_source using the same priority as
+        credentials.resolve_credential (CLI_SPEC §4):
+        env var wins over saved key.
+        """
         saved_key = read_key(config_dir=self._config_dir)
         env_key = os.environ.get(ENV_VAR)
 
         saved_present = saved_key is not None
         env_present = env_key is not None
 
+        # Determine which source would be used if a run were started now
         if env_present:
             effective_source = "env"
         elif saved_present:
@@ -143,8 +170,9 @@ class AuthCommandExecution:
         else:
             effective_source = "none"
 
-        # Verification against OpenRouter is not performed here;
-        # the CLI layer handles live verification when needed.
+        # Verification against OpenRouter (GET /api/v1/key) is not performed
+        # in the dispatcher — it will be added at the CLI layer when live
+        # verification is implemented. For now, report "not_checked".
         verification = "not_checked"
 
         result = AuthStatusResult(
@@ -171,7 +199,7 @@ class AuthCommandExecution:
     def _handle_auth_clear(
         self, cmd: AuthClearCommand, seq: int
     ) -> tuple[ApplicationEvent, AuthClearResult]:
-        """Handle AuthClearCommand — delete key file."""
+        """Handle AuthClearCommand — delete the saved key file."""
         removed = delete_key(config_dir=self._config_dir)
         event = _make_event(
             cmd.command_id,

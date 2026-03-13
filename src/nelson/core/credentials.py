@@ -1,4 +1,10 @@
-"""Credential resolution — CLI override > env var > saved key."""
+"""Credential resolution — CLI override > env var > saved key.
+
+Resolution order is defined in CLI_SPEC §4:
+1. --openrouter-api-key (CLI flag)
+2. OPENROUTER_API_KEY (environment variable)
+3. ~/.nelson/openrouter_api_key (saved key file)
+"""
 
 import os
 from pathlib import Path
@@ -19,20 +25,19 @@ def resolve_credential(
 ) -> str:
     """Resolve the effective OpenRouter API key.
 
-    Resolution order (first non-None wins):
-    1. ``cli_key`` — explicit CLI override (``--openrouter-api-key``)
-    2. ``OPENROUTER_API_KEY`` environment variable
-    3. Saved key on disk (``~/.nelson/openrouter_api_key``)
-
-    Raises ``MissingCredentialError`` if no key is available.
+    Tries each source in priority order and returns the first one found.
+    Raises ``MissingCredentialError`` if no key is available from any source.
     """
+    # 1. Explicit CLI override takes highest priority
     if cli_key is not None:
         return cli_key
 
+    # 2. Environment variable is second
     env_key = os.environ.get(ENV_VAR)
     if env_key is not None:
         return env_key
 
+    # 3. Saved key file is the fallback
     saved_key = read_key(config_dir=config_dir)
     if saved_key is not None:
         return saved_key
