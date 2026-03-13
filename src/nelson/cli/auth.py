@@ -30,7 +30,7 @@ def set_key(
     api_key: Annotated[str, typer.Option("--api-key", help="OpenRouter API key to save")],
 ) -> None:
     """Save an OpenRouter API key."""
-    cmd = AuthSetCommand(command_id="cmd_auth_set", api_key=api_key)
+    cmd = AuthSetCommand(api_key=api_key)
     result = asyncio.run(_drain_and_result(dispatch(cmd, config_dir=_config_dir())))
 
     if isinstance(result, AuthSetResult) and result.saved:
@@ -44,7 +44,7 @@ def set_key(
 @app.command()
 def status() -> None:
     """Show credential status and verify the key."""
-    cmd = AuthStatusCommand(command_id="cmd_auth_status")
+    cmd = AuthStatusCommand()
     result = asyncio.run(_drain_and_result(dispatch(cmd, config_dir=_config_dir())))
 
     if not isinstance(result, AuthStatusResult):
@@ -69,7 +69,7 @@ def status() -> None:
 @app.command()
 def clear() -> None:
     """Remove the saved API key."""
-    cmd = AuthClearCommand(command_id="cmd_auth_clear")
+    cmd = AuthClearCommand()
     result = asyncio.run(_drain_and_result(dispatch(cmd, config_dir=_config_dir())))
 
     if isinstance(result, AuthClearResult):
