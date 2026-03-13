@@ -51,9 +51,9 @@ def status() -> None:
         typer.echo("Unexpected error checking auth status.", err=True)
         raise typer.Exit(code=3)
 
-    typer.echo(f"Saved key:   {'present' if result.saved_key_present else 'absent'}")
-    typer.echo(f"Env key:     {'present' if result.env_key_present else 'absent'}")
-    typer.echo(f"Effective:   {result.effective_source}")
+    typer.echo(f"Saved key:    {'present' if result.saved_key_present else 'absent'}")
+    typer.echo(f"Env key:      {'present' if result.env_key_present else 'absent'}")
+    typer.echo(f"Effective:    {result.effective_source}")
     typer.echo(f"Verification: {result.verification}")
 
     if result.effective_source == "none":
