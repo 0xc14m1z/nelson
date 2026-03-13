@@ -45,7 +45,7 @@ def set_key(
         cmd = AuthSetCommand(api_key=api_key)
     except ValidationError:
         typer.echo("API key must not be empty.", err=True)
-        raise typer.Exit(code=ExitCode.INVALID_USAGE)
+        raise typer.Exit(code=ExitCode.INVALID_USAGE) from None
     result = asyncio.run(_drain_and_result(dispatch(cmd, config_dir=_config_dir())))
 
     if isinstance(result, AuthSetResult) and result.saved:

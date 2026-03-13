@@ -836,6 +836,72 @@ Update `docs/plans/PROGRESS.md` with final status.
 
 ---
 
+### Phase 11: Structured Logging and Observability
+
+#### Session start
+
+**Read these docs:** `PYTHON_ENGINEERING_STANDARDS.md` (§7 Observability), `EVENT_SCHEMA.md`
+
+**Verify Phase 10 is complete:**
+```bash
+uv run pytest -v -m "not live" && uv run pyright && uv run ruff check . && echo "Phase 10 verified"
+```
+
+#### Objective
+
+Add structured logging throughout the entire codebase so that every significant decision, state transition, and failure is observable in production. Nelson should be fully debuggable from its logs alone — without a debugger, without reproducing the issue.
+
+#### TDD approach
+
+**Tests to write FIRST (all must fail initially):**
+
+1. `tests/test_observability/test_logging.py`:
+   - `test_provider_invoke_logs_request_and_response` — assert structured log entries are emitted for every provider call (model, message count, finish reason, token usage)
+   - `test_provider_invoke_logs_on_failure` — assert error details are logged with full context when a provider call fails
+   - `test_provider_stream_logs_lifecycle` — assert log entries for stream open, delta count, usage, and close
+   - `test_consensus_round_logs_decisions` — assert each consensus round logs participant count, review decisions, and outcome
+   - `test_structured_output_parse_failure_logged` — assert a warning is logged when JSON parsing fails in the provider layer (the silent `contextlib.suppress` path)
+   - `test_credential_resolution_logs_source` — assert which credential source was used (CLI override, env var, saved key) is logged
+   - `test_log_entries_are_structured_json` — assert log output is machine-parseable structured JSON, not free-form text
+
+**Implementation:**
+
+- `src/nelson/core/logging.py` — logging configuration, structured formatter, context injection (run ID, phase, model)
+- Add `structlog` or `logfire` as the logging backend (per PYTHON_ENGINEERING_STANDARDS.md §7)
+- Instrument every module with structured log calls at appropriate levels:
+  - **DEBUG**: request/response payloads, SSE frame parsing, credential resolution steps
+  - **INFO**: provider calls (model, token count, latency), consensus round outcomes, phase transitions
+  - **WARNING**: silent fallbacks (JSON parse failure, unknown finish_reason, missing usage data), retry attempts
+  - **ERROR**: provider failures, quorum loss, structured output repair failures
+- Add correlation context: run ID, round number, participant model, invocation purpose
+- Ensure no sensitive data is logged (API keys, full prompts in production mode)
+
+#### Dependencies on earlier phases
+
+All previous phases (everything must work before adding observability).
+
+#### Out of scope
+
+- External log aggregation setup (Datadog, CloudWatch, etc.)
+- Log rotation or retention policies
+- Performance profiling or tracing spans (beyond what logfire provides out of the box)
+
+#### Exit criteria
+
+- Every provider call (invoke and stream) emits structured log entries
+- Every consensus decision point is logged with context
+- Every silent fallback or suppressed error emits a warning-level log
+- All log entries are structured JSON with consistent field names
+- No API keys or full prompt content appear in logs
+- All existing tests still pass (logging must not change behavior)
+- At least one integration test verifies end-to-end log output for a full consensus run
+
+#### Phase completion
+
+Update `docs/plans/PROGRESS.md`.
+
+---
+
 ## 4. Parallelization Guidance
 
 ### What can be developed in parallel
@@ -861,6 +927,7 @@ The phase sequence itself is strictly sequential:
 | Phase 8 | Phase 7 (multi-round consensus works) |
 | Phase 9 | Phase 8 (all failure paths work) |
 | Phase 10 | Phase 9 (everything works) |
+| Phase 11 | Phase 10 (full acceptance suite passes) |
 
 **Note:** Phases 4 and 5 depend on Phase 2 but not on each other. They could theoretically be developed in parallel, but sequential execution within a single session is simpler.
 
