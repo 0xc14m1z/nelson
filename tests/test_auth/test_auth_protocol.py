@@ -24,9 +24,7 @@ async def test_auth_set_emits_correct_events(tmp_home: Path) -> None:
     result = await execution.result()
 
     event_types = [e.type for e in events]
-    assert event_types[0] == "command_received"
-    assert "auth_key_saved" in event_types
-    assert event_types[-1] == "command_completed"
+    assert event_types == ["command_received", "auth_key_saved", "command_completed"]
     assert isinstance(result, AuthSetResult)
 
 
@@ -38,9 +36,7 @@ async def test_auth_status_emits_correct_events(tmp_home: Path) -> None:
     result = await execution.result()
 
     event_types = [e.type for e in events]
-    assert event_types[0] == "command_received"
-    assert "auth_status_reported" in event_types
-    assert event_types[-1] in ("command_completed", "command_failed")
+    assert event_types == ["command_received", "auth_status_reported", "command_completed"]
     assert isinstance(result, AuthStatusResult)
 
 
@@ -52,9 +48,7 @@ async def test_auth_clear_emits_correct_events(tmp_home: Path) -> None:
     result = await execution.result()
 
     event_types = [e.type for e in events]
-    assert event_types[0] == "command_received"
-    assert "auth_key_cleared" in event_types
-    assert event_types[-1] == "command_completed"
+    assert event_types == ["command_received", "auth_key_cleared", "command_completed"]
     assert isinstance(result, AuthClearResult)
 
 
