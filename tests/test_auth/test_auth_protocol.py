@@ -1,5 +1,6 @@
 """Auth protocol tests — dispatcher event stream (T-PROTO-003 adapted)."""
 
+import os
 from pathlib import Path
 
 from nelson.core.dispatcher import AuthCommandExecution, dispatch
@@ -63,3 +64,57 @@ async def test_auth_set_resolves_typed_result(tmp_home: Path) -> None:
     assert isinstance(result, AuthSetResult)
     assert result.saved is True
     assert "openrouter_api_key" in result.storage_path
+
+
+# ── Failure path tests ───────────────────────────────────────────────────
+
+
+async def test_auth_set_emits_command_failed_on_unwritable_dir(tmp_home: Path) -> None:
+    """AuthSetCommand emits command_failed when the config dir is not writable."""
+    config_dir = tmp_home / ".nelson"
+    config_dir.mkdir()
+    # Remove write permission so save_key raises an OSError
+    os.chmod(config_dir, 0o444)
+
+    cmd = AuthSetCommand(command_id="cmd_test_fail_set", api_key="sk-test")
+    execution = dispatch(cmd, config_dir=config_dir)
+    events = await _collect_events(execution)
+    result = await execution.result()
+
+    event_types = [e.type for e in events]
+    assert event_types == ["command_received", "command_failed"]
+    # No result is produced on failure
+    assert result is None
+
+    # The command_failed event carries a structured error
+    failed_event = events[1]
+    assert failed_event.payload.error.code == "credential_storage_error"
+    assert failed_event.payload.error.retryable is False
+
+    # Restore permissions so tmp_path cleanup succeeds
+    os.chmod(config_dir, 0o755)
+
+
+async def test_auth_clear_emits_command_failed_on_unwritable_dir(tmp_home: Path) -> None:
+    """AuthClearCommand emits command_failed when the key file can't be deleted."""
+    config_dir = tmp_home / ".nelson"
+    config_dir.mkdir()
+    key_file = config_dir / "openrouter_api_key"
+    key_file.write_text("sk-to-delete")
+    # Remove write permission on the directory (needed to unlink files)
+    os.chmod(config_dir, 0o444)
+
+    cmd = AuthClearCommand(command_id="cmd_test_fail_clear")
+    execution = dispatch(cmd, config_dir=config_dir)
+    events = await _collect_events(execution)
+    result = await execution.result()
+
+    event_types = [e.type for e in events]
+    assert event_types == ["command_received", "command_failed"]
+    assert result is None
+
+    failed_event = events[1]
+    assert failed_event.payload.error.code == "credential_storage_error"
+
+    # Restore permissions so tmp_path cleanup succeeds
+    os.chmod(config_dir, 0o755)

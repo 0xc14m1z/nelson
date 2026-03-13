@@ -18,6 +18,7 @@ from nelson.protocols.commands import (
     AuthSetCommand,
     AuthStatusCommand,
 )
+from nelson.protocols.domain import ErrorObject
 from nelson.protocols.enums import EventType, Phase, Role
 from nelson.protocols.events import (
     ApplicationEvent,
@@ -25,6 +26,7 @@ from nelson.protocols.events import (
     AuthKeySavedPayload,
     AuthStatusReportedPayload,
     CommandCompletedPayload,
+    CommandFailedPayload,
     CommandReceivedPayload,
     EventPayload,
 )
@@ -91,10 +93,13 @@ class AuthCommandExecution:
     async def _execute(self) -> AsyncIterator[ApplicationEvent]:
         """Generate the event stream for an auth command.
 
-        Every auth command produces exactly 3 events:
+        On success the stream is exactly 3 events:
         1. command_received (APPLICATION_PROTOCOL §9 — always first)
         2. One domain event (auth_key_saved / auth_status_reported / auth_key_cleared)
         3. command_completed (APPLICATION_PROTOCOL §9 — always last)
+
+        On failure the domain event is skipped and command_failed replaces
+        command_completed, so the stream is exactly 2 events.
         """
         cmd = self._command
         seq = 1
@@ -110,18 +115,34 @@ class AuthCommandExecution:
         seq += 1
 
         # Event 2: execute the command and emit the domain event
-        if isinstance(cmd, AuthSetCommand):
-            event, self._result = self._handle_auth_set(cmd, seq)
+        try:
+            if isinstance(cmd, AuthSetCommand):
+                event, self._result = self._handle_auth_set(cmd, seq)
+            elif isinstance(cmd, AuthStatusCommand):
+                event, self._result = self._handle_auth_status(cmd, seq)
+            else:
+                event, self._result = self._handle_auth_clear(cmd, seq)
             yield event
             seq += 1
-        elif isinstance(cmd, AuthStatusCommand):
-            event, self._result = self._handle_auth_status(cmd, seq)
-            yield event
-            seq += 1
-        else:
-            event, self._result = self._handle_auth_clear(cmd, seq)
-            yield event
-            seq += 1
+        except OSError as exc:
+            # Filesystem errors (permission denied, disk full, etc.)
+            # produce a command_failed event instead of a domain event.
+            yield _make_event(
+                cmd.command_id,
+                seq,
+                EventType.COMMAND_FAILED,
+                Phase.AUTH,
+                CommandFailedPayload(
+                    command_type=cmd.type,
+                    error=ErrorObject(
+                        code="credential_storage_error",
+                        message=str(exc),
+                        retryable=False,
+                    ),
+                ),
+            )
+            # No result — caller sees None from result()
+            return
 
         # Event 3: mark the command as completed
         yield _make_event(
