@@ -6,6 +6,7 @@ from typing import Annotated
 
 import typer
 
+from nelson.cli.exit_codes import ExitCode
 from nelson.core.dispatcher import AuthCommandExecution, dispatch
 from nelson.protocols.commands import AuthClearCommand, AuthSetCommand, AuthStatusCommand
 from nelson.protocols.results import AuthClearResult, AuthSetResult, AuthStatusResult, CommandResult
@@ -44,11 +45,11 @@ def set_key(
 
     if isinstance(result, AuthSetResult) and result.saved:
         typer.echo(f"Saved OpenRouter API key to {result.storage_path}")
-        raise typer.Exit(code=0)
+        raise typer.Exit(code=ExitCode.SUCCESS)
 
-    # Exit 3 = credential storage error (CLI_SPEC §3)
+    # Credential storage error (CLI_SPEC §3)
     typer.echo("Failed to save API key.", err=True)
-    raise typer.Exit(code=3)
+    raise typer.Exit(code=ExitCode.CREDENTIAL_ERROR)
 
 
 @app.command()
@@ -60,7 +61,7 @@ def status() -> None:
     # Guard against unexpected dispatcher failures
     if not isinstance(result, AuthStatusResult):
         typer.echo("Unexpected error checking auth status.", err=True)
-        raise typer.Exit(code=3)
+        raise typer.Exit(code=ExitCode.CREDENTIAL_ERROR)
 
     # Always print the full status report before deciding the exit code
     typer.echo(f"Saved key:    {'present' if result.saved_key_present else 'absent'}")
@@ -68,17 +69,16 @@ def status() -> None:
     typer.echo(f"Effective:    {result.effective_source}")
     typer.echo(f"Verification: {result.verification}")
 
-    # effective_source is "none" when neither env var nor saved key exists.
-    # Exit 3 = missing credentials (CLI_SPEC §3, §5.2)
+    # effective_source is "none" when neither env var nor saved key exists (CLI_SPEC §3, §5.2)
     if result.effective_source == "none":
-        raise typer.Exit(code=3)
+        raise typer.Exit(code=ExitCode.CREDENTIAL_ERROR)
 
-    # Exit 4 = key exists but OpenRouter rejected it (CLI_SPEC §3, §5.2)
+    # Key exists but OpenRouter rejected it (CLI_SPEC §3, §5.2)
     if result.verification == "invalid":
-        raise typer.Exit(code=4)
+        raise typer.Exit(code=ExitCode.CREDENTIAL_VERIFICATION_FAILED)
 
-    # Exit 0 = key found and either verified or not yet checked
-    raise typer.Exit(code=0)
+    # Key found and either verified or not yet checked
+    raise typer.Exit(code=ExitCode.SUCCESS)
 
 
 @app.command()
@@ -93,8 +93,8 @@ def clear() -> None:
         else:
             # No file to delete — still a success per CLI_SPEC §5.3
             typer.echo("No saved key to remove.")
-        raise typer.Exit(code=0)
+        raise typer.Exit(code=ExitCode.SUCCESS)
 
-    # Exit 3 = credential storage error (CLI_SPEC §3)
+    # Credential storage error (CLI_SPEC §3)
     typer.echo("Failed to clear API key.", err=True)
-    raise typer.Exit(code=3)
+    raise typer.Exit(code=ExitCode.CREDENTIAL_ERROR)
