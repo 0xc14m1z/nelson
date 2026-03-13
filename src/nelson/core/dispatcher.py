@@ -19,7 +19,7 @@ from nelson.protocols.commands import (
     AuthStatusCommand,
 )
 from nelson.protocols.domain import ErrorObject
-from nelson.protocols.enums import EventType, Phase, Role
+from nelson.protocols.enums import ErrorCode, EventType, Phase, Role
 from nelson.protocols.events import (
     ApplicationEvent,
     AuthKeyClearedPayload,
@@ -135,7 +135,7 @@ class AuthCommandExecution:
                 CommandFailedPayload(
                     command_type=cmd.type,
                     error=ErrorObject(
-                        code="credential_storage_error",
+                        code=ErrorCode.CREDENTIAL_STORAGE_ERROR,
                         message=str(exc),
                         retryable=False,
                     ),

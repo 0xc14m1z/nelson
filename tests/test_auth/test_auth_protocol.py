@@ -5,6 +5,7 @@ from pathlib import Path
 
 from nelson.core.dispatcher import AuthCommandExecution, dispatch
 from nelson.protocols.commands import AuthClearCommand, AuthSetCommand, AuthStatusCommand
+from nelson.protocols.enums import ErrorCode
 from nelson.protocols.events import ApplicationEvent
 from nelson.protocols.results import AuthClearResult, AuthSetResult, AuthStatusResult
 
@@ -88,7 +89,7 @@ async def test_auth_set_emits_command_failed_on_unwritable_dir(tmp_home: Path) -
 
     # The command_failed event carries a structured error
     failed_event = events[1]
-    assert failed_event.payload.error.code == "credential_storage_error"
+    assert failed_event.payload.error.code == ErrorCode.CREDENTIAL_STORAGE_ERROR
     assert failed_event.payload.error.retryable is False
 
     # Restore permissions so tmp_path cleanup succeeds
@@ -114,7 +115,7 @@ async def test_auth_clear_emits_command_failed_on_unwritable_dir(tmp_home: Path)
     assert result is None
 
     failed_event = events[1]
-    assert failed_event.payload.error.code == "credential_storage_error"
+    assert failed_event.payload.error.code == ErrorCode.CREDENTIAL_STORAGE_ERROR
 
     # Restore permissions so tmp_path cleanup succeeds
     os.chmod(config_dir, 0o755)
