@@ -5,6 +5,8 @@ from typing import Annotated
 
 import typer
 
+from nelson.cli.exit_codes import ExitCode
+
 
 def run(
     participant: Annotated[
@@ -28,4 +30,4 @@ def run(
     jsonl: Annotated[bool, typer.Option("--jsonl", help="Output JSON Lines event stream")] = False,
 ) -> None:
     """Run a multi-LLM consensus session."""
-    raise typer.Exit(code=0)
+    raise typer.Exit(code=ExitCode.SUCCESS)

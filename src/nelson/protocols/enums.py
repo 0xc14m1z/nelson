@@ -178,6 +178,21 @@ class OutputFormat(StrEnum):
     STRUCTURED = "structured"
 
 
+class ErrorCode(StrEnum):
+    """Machine-readable error codes for ErrorObject (CLI_SPEC §10)."""
+
+    CREDENTIAL_STORAGE_ERROR = "credential_storage_error"
+    PROVIDER_TIMEOUT = "provider_timeout"
+    PARTICIPANT_FAILED = "participant_failed"
+    PARTICIPANT_QUORUM_LOST = "participant_quorum_lost"
+    FRAMING_UPDATE_BUDGET_EXHAUSTED = "framing_update_budget_exhausted"
+    MODERATOR_FAILED = "moderator_failed"
+    STRUCTURED_OUTPUT_INVALID = "structured_output_invalid"
+    STRUCTURED_OUTPUT_REPAIR_FAILED = "structured_output_repair_failed"
+    SERIALIZATION_FAILED = "serialization_failed"
+    INTERRUPTED = "interrupted"
+
+
 class Adapter(StrEnum):
     """Interface that originated a command."""
 
