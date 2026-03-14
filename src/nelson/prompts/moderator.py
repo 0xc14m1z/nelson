@@ -8,7 +8,7 @@ handles placeholder injection and message formatting.
 
 from nelson.prompts.labels import label_contributions
 from nelson.prompts.loader import PromptName, render_prompt
-from nelson.protocols.domain import TaskFramingResult
+from nelson.protocols.domain import ParticipantContribution, TaskFramingResult
 
 
 def build_framing_messages(
@@ -33,7 +33,7 @@ def build_synthesis_messages(
     *,
     user_prompt: str,
     framing: TaskFramingResult,
-    contributions: list[dict[str, object]],
+    contributions: list[ParticipantContribution],
     round_number: int,
 ) -> list[dict[str, str]]:
     """Build messages for the moderator candidate synthesis invocation."""

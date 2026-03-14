@@ -186,7 +186,6 @@ async def run_consensus(
 
     # ── 2. Participant Contributions ────────────────────────────────────
     contributions: list[ParticipantContribution] = []
-    contribution_dicts: list[dict[str, object]] = []
 
     for participant in participants:
         inv_id = make_invocation_id()
@@ -215,7 +214,6 @@ async def run_consensus(
         )
         contribution = ParticipantContribution.model_validate(response.parsed)
         contributions.append(contribution)
-        contribution_dicts.append(contribution.model_dump())
         _record_usage(invocation_usages, inv_id, participant, Role.PARTICIPANT,
                       InvocationPurpose.INITIAL_CONTRIBUTION, response.usage)
 
@@ -255,7 +253,7 @@ async def run_consensus(
         build_synthesis_messages(
             user_prompt=prompt_text,
             framing=framing,
-            contributions=contribution_dicts,
+            contributions=contributions,
             round_number=1,
         ),
     )
@@ -349,7 +347,7 @@ async def run_consensus(
                 framing=framing,
                 candidate_markdown=synthesis.candidate_markdown,
                 synthesis_summary=synthesis.summary,
-                contributions=contribution_dicts,
+                contributions=contributions,
                 participant_model=participant,
             ),
         )
