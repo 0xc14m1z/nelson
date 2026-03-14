@@ -427,6 +427,7 @@ For Nelson specifically:
 - Do not bury important control flow in decorators or metaprogramming.
 - Do not mix sync and async APIs casually in the same abstraction.
 - Do not silently coerce invalid data when validation should fail explicitly.
+- Do not use magic strings for values that belong to a known closed set — use `StrEnum` instead.
 - Do not duplicate schemas in multiple places.
 
 ## 14. Code Review Standards

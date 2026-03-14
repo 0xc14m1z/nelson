@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from nelson.core.dispatcher import AuthCommandExecution, dispatch
 from nelson.protocols.commands import AuthClearCommand, AuthSetCommand, AuthStatusCommand
 from nelson.protocols.enums import ErrorCode
-from nelson.protocols.events import ApplicationEvent
+from nelson.protocols.events import ApplicationEvent, CommandFailedPayload
 from nelson.protocols.results import AuthClearResult, AuthSetResult, AuthStatusResult
 
 
@@ -90,8 +90,10 @@ async def test_auth_set_emits_command_failed_on_unwritable_dir(tmp_home: Path) -
     # No result is produced on failure
     assert result is None
 
-    # The command_failed event carries a structured error
+    # The command_failed event carries a structured error —
+    # narrow the union so pyright knows we have CommandFailedPayload.
     failed_event = events[1]
+    assert isinstance(failed_event.payload, CommandFailedPayload)
     assert failed_event.payload.error.code == ErrorCode.CREDENTIAL_STORAGE_ERROR
     assert failed_event.payload.error.retryable is False
 
@@ -118,6 +120,7 @@ async def test_auth_clear_emits_command_failed_on_unwritable_dir(tmp_home: Path)
     assert result is None
 
     failed_event = events[1]
+    assert isinstance(failed_event.payload, CommandFailedPayload)
     assert failed_event.payload.error.code == ErrorCode.CREDENTIAL_STORAGE_ERROR
 
     # Restore permissions so tmp_path cleanup succeeds

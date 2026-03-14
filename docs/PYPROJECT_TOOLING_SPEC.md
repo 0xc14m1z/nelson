@@ -63,7 +63,7 @@ Runtime dependencies `MUST` contain only libraries required to run Nelson as an 
 Expected runtime categories:
 
 - CLI framework
-- async HTTP client
+- LLM provider SDK (OpenAI Python SDK, pointed at OpenRouter's base URL)
 - validation and schemas
 - optional runtime observability integration
 
@@ -113,7 +113,7 @@ The exact versions may evolve, but the dependency set `MUST` support the agreed 
 Expected runtime dependencies:
 
 - `typer`
-- `httpx`
+- `openai` (Python SDK, pointed at OpenRouter's base URL)
 - `pydantic`
 - `pydantic-settings` only if later needed, not automatically
 - `rich` for human CLI rendering

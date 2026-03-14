@@ -7,6 +7,7 @@ from nelson.protocols.enums import (
     Adapter,
     CandidateSource,
     EventType,
+    FinishReason,
     InvocationPurpose,
     OutputFormat,
     Phase,
@@ -226,7 +227,7 @@ class ModelCompletedPayload(BaseModel):
     framing_version: int | None = Field(
         default=None, description="Task framing version, if applicable."
     )
-    finish_reason: str = Field(description="Model's finish reason (e.g. 'stop').")
+    finish_reason: FinishReason = Field(description="Why the model stopped generating tokens.")
     output_format: OutputFormat = Field(description="Whether output is text or structured.")
     parsed: dict[str, object] | None = Field(
         default=None, description="Parsed structured output, if applicable."

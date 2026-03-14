@@ -182,6 +182,8 @@ class ErrorCode(StrEnum):
     """Machine-readable error codes for ErrorObject (CLI_SPEC §10)."""
 
     CREDENTIAL_STORAGE_ERROR = "credential_storage_error"
+    PROVIDER_AUTH_ERROR = "provider_auth_error"
+    PROVIDER_TRANSPORT_ERROR = "provider_transport_error"
     PROVIDER_TIMEOUT = "provider_timeout"
     PARTICIPANT_FAILED = "participant_failed"
     PARTICIPANT_QUORUM_LOST = "participant_quorum_lost"
@@ -191,6 +193,16 @@ class ErrorCode(StrEnum):
     STRUCTURED_OUTPUT_REPAIR_FAILED = "structured_output_repair_failed"
     SERIALIZATION_FAILED = "serialization_failed"
     INTERRUPTED = "interrupted"
+
+
+class FinishReason(StrEnum):
+    """Why a model invocation stopped generating tokens."""
+
+    STOP = "stop"
+    LENGTH = "length"
+    CONTENT_FILTER = "content_filter"
+    TOOL_CALLS = "tool_calls"
+    ERROR = "error"
 
 
 class Adapter(StrEnum):
