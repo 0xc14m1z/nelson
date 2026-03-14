@@ -12,7 +12,7 @@ Each session starts by reading this file and running the verification command fo
 | 3. Auth & Credentials | complete | 2026-03-13 | 69 tests pass, pyright 0 errors, ruff clean |
 | 4. Provider & Fake | complete | 2026-03-13 | 82 tests pass, pyright 0 errors, ruff clean |
 | 5. Event Machinery & CLI Validation | complete | 2026-03-14 | 100 tests pass, pyright 0 errors, ruff clean |
-| 6. Happy-Path Consensus (demo checkpoint) | not started | | |
+| 6. Happy-Path Consensus (demo checkpoint) | complete | 2026-03-14 | 122 tests pass, pyright 0 errors, ruff clean |
 | 7. Multi-Round & Framing Updates | not started | | |
 | 8. Retry, Repair & Failure | not started | | |
 | 9. Observability & Progress | not started | | |
@@ -82,3 +82,17 @@ PR #2. 69 tests (28 new auth tests).
 - Centralized `utils/ids.py`: `make_run_id()`, `make_command_id()`, `make_invocation_id()`, `make_candidate_id()` with shared `_make_id(prefix)` helper. Replaced duplicate `_make_command_id()` in `commands.py`.
 - Centralized `utils/clock.py`: `utc_now_iso()` returning ISO 8601 string. Replaced inline `datetime.now(UTC).isoformat()` in `dispatcher.py`.
 - CLI `run` validation: 9 rejection rules (fewer than 2 participants, missing moderator, no prompt source, multiple prompt sources, json+jsonl conflict, duplicate participants, non-positive max-rounds, nonexistent prompt file, invalid release-gate mode). `--release-gate` typed as `ReleaseGateMode` enum for compile-time and runtime validation.
+
+### Phase 6: Happy-Path Consensus — Demo Checkpoint (2026-03-14)
+
+22 new tests (6 happy-path + 5 event ordering + 4 run result + 3 human output + 2 JSON + 2 JSONL), 122 total.
+
+- **Consensus orchestrator** (`consensus/orchestrator.py`): Full happy-path consensus loop — task framing → participant contributions → candidate synthesis → participant reviews → release gate → RunResult. Single-round only (approve/minor_revise); multi-round deferred to Phase 7.
+- **Prompt templates** (`prompts/moderator.py`, `prompts/participant.py`): System+user message builders for all 5 consensus phases per PROMPT_SPEC. Shared contribution-labeling utility extracted to `prompts/labels.py`.
+- **Output renderers** (`cli/render_human.py`, `cli/render_json.py`, `cli/render_jsonl.py`): Human mode (final answer on stdout, progress on stderr), JSON mode (single `model_dump_json()` object), JSONL mode (one event per line with monotonic sequence).
+- **EventEmitter** used as central event factory for the orchestrator with batch-collect pattern.
+- `duration_ms()` added to `utils/clock.py` for timestamp duration calculation.
+- `_aggregate_usage()` sums tokens and cost_usd across all invocations.
+- Dynamic consensus summary reflects actual vote distribution (approve/minor_revise counts).
+- `schema_name` fields use `__name__` instead of hardcoded strings to stay in sync with model renames.
+- Comprehensive inline comments on Phase 6 design constraints (single framing version, non-streaming, single-round).
