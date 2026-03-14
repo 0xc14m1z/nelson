@@ -9,7 +9,6 @@ Event ordering follows APPLICATION_PROTOCOL §9-10:
 
 import os
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
 from pathlib import Path
 
 from nelson.core.credentials import ENV_VAR
@@ -37,6 +36,7 @@ from nelson.protocols.results import (
     CommandResult,
 )
 from nelson.storage.auth import delete_key, read_key, save_key
+from nelson.utils.clock import utc_now_iso
 
 AuthCommand = AuthSetCommand | AuthStatusCommand | AuthClearCommand
 """Union of auth command types handled by this dispatcher."""
@@ -58,7 +58,7 @@ def _make_event(
         event_id=f"evt_{command_id}_{sequence}",
         command_id=command_id,
         sequence=sequence,
-        timestamp=datetime.now(UTC).isoformat(),
+        timestamp=utc_now_iso(),
         type=event_type,
         phase=phase,
         role=Role.SYSTEM,
