@@ -10,3 +10,10 @@ from datetime import UTC, datetime
 def utc_now_iso() -> str:
     """Return the current UTC time as an ISO 8601 string."""
     return datetime.now(UTC).isoformat()
+
+
+def duration_ms(start_iso: str, end_iso: str) -> int:
+    """Compute the duration in milliseconds between two ISO 8601 timestamps."""
+    start = datetime.fromisoformat(start_iso)
+    end = datetime.fromisoformat(end_iso)
+    return int((end - start).total_seconds() * 1000)
