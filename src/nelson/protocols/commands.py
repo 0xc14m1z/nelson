@@ -1,11 +1,11 @@
 """Typed application command models."""
 
-import uuid
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field, field_validator
 
 from nelson.protocols.enums import Adapter, CommandType, InputSource, ReleaseGateMode
+from nelson.utils.ids import make_command_id
 
 
 def _utc_now() -> datetime:
@@ -13,16 +13,11 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def _make_command_id() -> str:
-    """Generate a unique command identifier with ``cmd_`` prefix."""
-    return f"cmd_{uuid.uuid4().hex[:12]}"
-
-
 class AuthSetCommand(BaseModel):
     """Command to save an OpenRouter API key."""
 
     command_id: str = Field(
-        default_factory=_make_command_id, description="Unique identifier for this command."
+        default_factory=make_command_id, description="Unique identifier for this command."
     )
     type: CommandType = Field(default=CommandType.AUTH_SET, description="Command discriminator.")
     issued_at: datetime = Field(
@@ -46,7 +41,7 @@ class AuthStatusCommand(BaseModel):
     """Command to check credential status."""
 
     command_id: str = Field(
-        default_factory=_make_command_id, description="Unique identifier for this command."
+        default_factory=make_command_id, description="Unique identifier for this command."
     )
     type: CommandType = Field(default=CommandType.AUTH_STATUS, description="Command discriminator.")
     issued_at: datetime = Field(
@@ -61,7 +56,7 @@ class AuthClearCommand(BaseModel):
     """Command to remove the saved API key."""
 
     command_id: str = Field(
-        default_factory=_make_command_id, description="Unique identifier for this command."
+        default_factory=make_command_id, description="Unique identifier for this command."
     )
     type: CommandType = Field(default=CommandType.AUTH_CLEAR, description="Command discriminator.")
     issued_at: datetime = Field(
@@ -76,7 +71,7 @@ class RunCommand(BaseModel):
     """Command to start a multi-LLM consensus session."""
 
     command_id: str = Field(
-        default_factory=_make_command_id, description="Unique identifier for this command."
+        default_factory=make_command_id, description="Unique identifier for this command."
     )
     type: CommandType = Field(default=CommandType.RUN, description="Command discriminator.")
     issued_at: datetime = Field(

@@ -11,7 +11,7 @@ Each session starts by reading this file and running the verification command fo
 | 2. Typed Contracts | complete | 2026-03-13 | 41 tests pass, pyright 0 errors, ruff clean |
 | 3. Auth & Credentials | complete | 2026-03-13 | 69 tests pass, pyright 0 errors, ruff clean |
 | 4. Provider & Fake | complete | 2026-03-13 | 82 tests pass, pyright 0 errors, ruff clean |
-| 5. Event Machinery & CLI Validation | not started | | |
+| 5. Event Machinery & CLI Validation | complete | 2026-03-14 | 100 tests pass, pyright 0 errors, ruff clean |
 | 6. Happy-Path Consensus (demo checkpoint) | not started | | |
 | 7. Multi-Round & Framing Updates | not started | | |
 | 8. Retry, Repair & Failure | not started | | |
@@ -73,3 +73,12 @@ PR #2. 69 tests (28 new auth tests).
 - SDK exceptions (`AuthenticationError`, `APITimeoutError`, `APIConnectionError`, `APIStatusError`) translated to domain errors via `_translate_error()`
 - Merged `_ErrorStream` into `FakeStream` (simplify review)
 - Removed trivial `test_core/test_errors.py` — error types are tested through provider and orchestration tests
+
+### Phase 5: Event Machinery & CLI Validation (2026-03-14)
+
+23 new tests (7 emitter + 5 ID generation + 11 CLI validation), 100 total.
+
+- `EventEmitter` class: monotonic sequence numbering, unique `evt_`-prefixed IDs, UTC ISO 8601 timestamps, async iteration. Batch-collect design for Phase 5; streaming variant planned for Phase 6+.
+- Centralized `utils/ids.py`: `make_run_id()`, `make_command_id()`, `make_invocation_id()`, `make_candidate_id()` with shared `_make_id(prefix)` helper. Replaced duplicate `_make_command_id()` in `commands.py`.
+- Centralized `utils/clock.py`: `utc_now_iso()` returning ISO 8601 string. Replaced inline `datetime.now(UTC).isoformat()` in `dispatcher.py`.
+- CLI `run` validation: 9 rejection rules (fewer than 2 participants, missing moderator, no prompt source, multiple prompt sources, json+jsonl conflict, duplicate participants, non-positive max-rounds, nonexistent prompt file, invalid release-gate mode). `--release-gate` typed as `ReleaseGateMode` enum for compile-time and runtime validation.
