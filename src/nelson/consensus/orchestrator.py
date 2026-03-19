@@ -7,6 +7,8 @@ Phase 6 implements only the happy path: all reviews approve (or minor_revise),
 no framing updates, no retries or repair.
 """
 
+import asyncio
+
 from nelson.core.events import EventEmitter
 from nelson.prompts.moderator import (
     build_framing_messages,
@@ -185,11 +187,14 @@ async def run_consensus(
         ),
     )
 
-    # ── 2. Participant Contributions ────────────────────────────────────
-    contributions: list[ParticipantContribution] = []
-
+    # ── 2. Participant Contributions (parallel) ──────────────────────────
+    # Participants are independent — invoke all concurrently via gather().
+    # Events are emitted in deterministic participant order: all MODEL_STARTED
+    # before the gather, all MODEL_COMPLETED after, preserving a clean stream.
+    contrib_inv_ids: list[str] = []
     for participant in participants:
         inv_id = make_invocation_id()
+        contrib_inv_ids.append(inv_id)
         emitter.emit(
             event_type=EventType.MODEL_STARTED,
             phase=Phase.PARTICIPANT_GENERATION,
@@ -200,11 +205,13 @@ async def run_consensus(
                 purpose=InvocationPurpose.INITIAL_CONTRIBUTION,
                 framing_version=1,
                 schema_name=ParticipantContribution.__name__,
+                # Phase 6 uses invoke() (non-streaming); streaming deferred
                 streaming=False,
             ),
         )
 
-        response = await _invoke_structured(
+    contrib_responses = await asyncio.gather(*(
+        _invoke_structured(
             provider,
             participant,
             build_contribution_messages(
@@ -213,11 +220,17 @@ async def run_consensus(
                 participant_model=participant,
             ),
         )
+        for participant in participants
+    ))
+
+    contributions: list[ParticipantContribution] = []
+    for participant, inv_id, response in zip(
+        participants, contrib_inv_ids, contrib_responses, strict=True,
+    ):
         contribution = ParticipantContribution.model_validate(response.parsed)
         contributions.append(contribution)
         _record_usage(invocation_usages, inv_id, participant, Role.PARTICIPANT,
                       InvocationPurpose.INITIAL_CONTRIBUTION, response.usage)
-
         emitter.emit(
             event_type=EventType.MODEL_COMPLETED,
             phase=Phase.PARTICIPANT_GENERATION,
@@ -319,12 +332,11 @@ async def run_consensus(
         ),
     )
 
-    reviews: list[ReviewResult] = []
-    approve_count = 0
-    minor_count = 0
-
+    # Emit all review MODEL_STARTED events, then gather calls in parallel
+    review_inv_ids: list[str] = []
     for participant in participants:
         inv_id = make_invocation_id()
+        review_inv_ids.append(inv_id)
         emitter.emit(
             event_type=EventType.MODEL_STARTED,
             phase=Phase.PARTICIPANT_REVIEW,
@@ -340,7 +352,8 @@ async def run_consensus(
             ),
         )
 
-        response = await _invoke_structured(
+    review_responses = await asyncio.gather(*(
+        _invoke_structured(
             provider,
             participant,
             build_review_messages(
@@ -352,6 +365,16 @@ async def run_consensus(
                 participant_model=participant,
             ),
         )
+        for participant in participants
+    ))
+
+    reviews: list[ReviewResult] = []
+    approve_count = 0
+    minor_count = 0
+
+    for participant, inv_id, response in zip(
+        participants, review_inv_ids, review_responses, strict=True,
+    ):
         review = ReviewResult.model_validate(response.parsed)
         reviews.append(review)
         _record_usage(invocation_usages, inv_id, participant, Role.PARTICIPANT,
