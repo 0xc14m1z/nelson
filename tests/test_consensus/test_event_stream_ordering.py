@@ -5,10 +5,22 @@ the ordering rules defined in EVENT_SCHEMA §5 and APPLICATION_PROTOCOL §10.
 """
 
 from nelson.protocols.enums import EventType, InvocationPurpose
-from nelson.protocols.events import ModelStartedPayload
+from nelson.protocols.events import (
+    ApplicationEvent,
+    ModelCompletedPayload,
+    ModelStartedPayload,
+)
 from nelson.providers.fake import FakeProvider
 
 from .conftest import run_happy_path
+
+
+def _purpose_of(event: ApplicationEvent) -> InvocationPurpose | None:
+    """Extract the invocation purpose from a model event, or None."""
+    payload = event.payload
+    if isinstance(payload, ModelStartedPayload | ModelCompletedPayload):
+        return payload.purpose
+    return None
 
 
 async def test_event_stream_starts_with_command_received(
@@ -64,6 +76,47 @@ async def test_task_framing_events_before_contributions(
                 return
     # If we get here, no contribution model_started was found — that's a test failure
     raise AssertionError("No model_started event with purpose=initial_contribution found")
+
+
+async def test_parallel_contributions_started_before_completed(
+    happy_path_provider: FakeProvider,
+) -> None:
+    """All contribution MODEL_STARTED events must appear before any
+    contribution MODEL_COMPLETED — validates the parallel gather pattern."""
+    events, _result = await run_happy_path(happy_path_provider)
+    contrib_started_indices: list[int] = []
+    contrib_completed_indices: list[int] = []
+    for i, event in enumerate(events):
+        if _purpose_of(event) != InvocationPurpose.INITIAL_CONTRIBUTION:
+            continue
+        if isinstance(event.payload, ModelStartedPayload):
+            contrib_started_indices.append(i)
+        elif isinstance(event.payload, ModelCompletedPayload):
+            contrib_completed_indices.append(i)
+    assert len(contrib_started_indices) >= 2, "Expected at least 2 contribution starts"
+    assert len(contrib_completed_indices) >= 2, "Expected at least 2 contribution completions"
+    # Every MODEL_STARTED must come before every MODEL_COMPLETED
+    assert max(contrib_started_indices) < min(contrib_completed_indices)
+
+
+async def test_parallel_reviews_started_before_completed(
+    happy_path_provider: FakeProvider,
+) -> None:
+    """All review MODEL_STARTED events must appear before any
+    review MODEL_COMPLETED — validates the parallel gather pattern."""
+    events, _result = await run_happy_path(happy_path_provider)
+    review_started_indices: list[int] = []
+    review_completed_indices: list[int] = []
+    for i, event in enumerate(events):
+        if _purpose_of(event) != InvocationPurpose.CANDIDATE_REVIEW:
+            continue
+        if isinstance(event.payload, ModelStartedPayload):
+            review_started_indices.append(i)
+        elif isinstance(event.payload, ModelCompletedPayload):
+            review_completed_indices.append(i)
+    assert len(review_started_indices) >= 2, "Expected at least 2 review starts"
+    assert len(review_completed_indices) >= 2, "Expected at least 2 review completions"
+    assert max(review_started_indices) < min(review_completed_indices)
 
 
 async def test_no_model_delta_for_structured_internal_phases(
