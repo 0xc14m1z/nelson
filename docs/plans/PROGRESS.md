@@ -13,7 +13,7 @@ Each session starts by reading this file and running the verification command fo
 | 4. Provider & Fake | complete | 2026-03-13 | 82 tests pass, pyright 0 errors, ruff clean |
 | 5. Event Machinery & CLI Validation | complete | 2026-03-14 | 100 tests pass, pyright 0 errors, ruff clean |
 | 6. Happy-Path Consensus (demo checkpoint) | complete | 2026-03-14 | 122 tests pass, pyright 0 errors, ruff clean |
-| 7. Multi-Round & Framing Updates | not started | | |
+| 7. Multi-Round & Framing Updates | complete | 2026-03-19 | 139 tests pass, pyright 0 errors, ruff clean |
 | 8. Retry, Repair & Failure | not started | | |
 | 9. Observability & Progress | not started | | |
 | 10. Validation & Release Readiness | not started | | |
@@ -96,3 +96,15 @@ PR #2. 69 tests (28 new auth tests).
 - Dynamic consensus summary reflects actual vote distribution (approve/minor_revise counts).
 - `schema_name` fields use `__name__` instead of hardcoded strings to stay in sync with model renames.
 - Comprehensive inline comments on Phase 6 design constraints (single framing version, non-streaming, single-round).
+
+### Phase 7: Multi-Round Consensus & Framing Updates (2026-03-19)
+
+15 new tests (5 multi-round + 3 partial consensus + 5 framing update + 1 framing budget + 1 anonymized review), 139 total.
+
+- **Multi-round consensus loop**: `major_revise` and `reject` reviews trigger new synthesis+review rounds. `minor_revise` is non-blocking — consensus closes in the same round. Early stop when consensus reached before `max_rounds`.
+- **Partial consensus**: when `max_rounds` exhausted with persistent blocking reviews, run returns `status=partial` with the best available candidate and `residual_disagreements` populated from the final round's blocking issues.
+- **Material framing updates**: moderator's `CandidateSynthesisResult.framing_update` (non-null) invalidates the current candidate, emits `task_framing_updated`, and triggers fresh `reframed_contribution` invocations under the new framing version. No `review_*` or `consensus_*` events emitted for invalidated candidates.
+- **Framing budget exhaustion**: framing update in the last available round fails the run with `framing_update_budget_exhausted` error code.
+- **Extracted helpers**: `_gather_contributions()` and `_gather_reviews()` factor out parallel invocation + event emission patterns. `_build_failed_result()` centralizes failure event emission and `RunResult` construction. `_tally_reviews()` counts decisions and detects blocking reviews in a single pass, keyed by `ReviewDecision` enum.
+- **Event changes**: `candidate_updated` emitted for re-synthesis rounds (with `previous_candidate_id`). `consensus_pending` emitted when blocking reviews prevent closure. `consensus_partial` emitted on max-rounds exhaustion. `round_completed` tracks `candidate_invalidated_by_framing_update`.
+- Invalidated rounds count toward `rounds_completed` per EVENT_SCHEMA §4.15 rules.

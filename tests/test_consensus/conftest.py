@@ -34,6 +34,10 @@ from nelson.utils.ids import make_command_id, make_run_id
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
+# Default participants used across all consensus test helpers
+DEFAULT_PARTICIPANTS = ["openai/gpt-4", "anthropic/claude-3-opus"]
+DEFAULT_MODERATOR = "openai/gpt-4"
+
 
 def _model_to_response(
     model: BaseModel,
@@ -50,6 +54,13 @@ def _model_to_response(
         parsed=model.model_dump(),  # type: ignore[arg-type]  # dict invariance
         usage=usage,
     )
+
+
+# ── Default usage snapshot ───────────────────────────────────────────
+
+_DEFAULT_USAGE = UsageSnapshot(
+    prompt_tokens=100, completion_tokens=50, total_tokens=150,
+)
 
 
 # ── Canned response builders ─────────────────────────────────────────
@@ -90,7 +101,7 @@ def contribution_response(label: str = "A") -> ProviderResponse:
 
 
 def synthesis_response() -> ProviderResponse:
-    """Moderator candidate synthesis response."""
+    """Moderator candidate synthesis response (no framing update)."""
     return _model_to_response(
         CandidateSynthesisResult(
             candidate_markdown=(
@@ -103,6 +114,69 @@ def synthesis_response() -> ProviderResponse:
         usage=UsageSnapshot(
             prompt_tokens=500, completion_tokens=200, total_tokens=700,
         ),
+    )
+
+
+def synthesis_with_framing_update() -> ProviderResponse:
+    """Moderator synthesis that triggers a material framing update (PROMPT_SPEC §6.3).
+
+    The framing_update field is non-null, which signals to the orchestrator
+    that the current candidate is invalidated and a new contribution round
+    must begin under the updated framing.
+    """
+    return _model_to_response(
+        CandidateSynthesisResult(
+            candidate_markdown="This candidate is invalidated by framing update.",
+            summary="Framing update required: deployment caveats missing",
+            relevant_excerpt_labels=["response_a"],
+            framing_update=TaskFramingResult(
+                task_type=TaskType.ANALYTICAL,
+                sensitivity=Sensitivity.MEDIUM,
+                objective="Provide a clear explanation including deployment caveats",
+                quality_criteria=["accuracy", "clarity", "completeness"],
+                aspects_to_cover=["definition", "key concepts", "examples", "deployment caveats"],
+                assumptions=["The user wants practical guidance"],
+            ),
+        ),
+        usage=_DEFAULT_USAGE,
+    )
+
+
+def review_major_revise_response() -> ProviderResponse:
+    """Participant review requesting major revision (blocking)."""
+    return _model_to_response(
+        ReviewResult(
+            decision=ReviewDecision.MAJOR_REVISE,
+            summary="The candidate has a significant factual error",
+            required_changes=["Correct the claim about deployment defaults"],
+            blocking_issues=["Unsupported technical claim about deployment"],
+        ),
+        usage=_DEFAULT_USAGE,
+    )
+
+
+def review_reject_response() -> ProviderResponse:
+    """Participant review that rejects the candidate (blocking)."""
+    return _model_to_response(
+        ReviewResult(
+            decision=ReviewDecision.REJECT,
+            summary="The candidate is fundamentally wrong",
+            required_changes=["Rewrite the entire answer"],
+            blocking_issues=["Core premise is incorrect"],
+        ),
+        usage=_DEFAULT_USAGE,
+    )
+
+
+def review_minor_revise_response() -> ProviderResponse:
+    """Participant review requesting minor revision (non-blocking)."""
+    return _model_to_response(
+        ReviewResult(
+            decision=ReviewDecision.MINOR_REVISE,
+            summary="Could use some polish",
+            optional_improvements=["Clarify packaging recommendation"],
+        ),
+        usage=_DEFAULT_USAGE,
     )
 
 
@@ -158,24 +232,27 @@ def happy_path_provider() -> FakeProvider:
     )
 
 
-async def run_happy_path(
+async def run_consensus_helper(
     provider: FakeProvider,
     *,
     release_gate_mode: ReleaseGateMode = ReleaseGateMode.AUTO,
     max_rounds: int = 10,
+    participants: list[str] | None = None,
+    moderator: str | None = None,
 ) -> tuple[list[ApplicationEvent], RunResult]:
     """Run the orchestrator with the given provider and return events + result.
 
     This helper centralizes the orchestrator call so all consensus tests
-    use the same setup.
+    use the same setup. Supports overriding participants and moderator
+    for tests that need different configurations.
     """
     from nelson.consensus.orchestrator import run_consensus
 
     emitter = EventEmitter(command_id=make_command_id(), run_id=make_run_id())
     result = await run_consensus(
         prompt_text="What is Python?",
-        participants=["openai/gpt-4", "anthropic/claude-3-opus"],
-        moderator="openai/gpt-4",
+        participants=participants or DEFAULT_PARTICIPANTS,
+        moderator=moderator or DEFAULT_MODERATOR,
         max_rounds=max_rounds,
         release_gate_mode=release_gate_mode,
         adapter=Adapter.CLI,
@@ -187,3 +264,18 @@ async def run_happy_path(
     async for event in emitter:
         events.append(event)
     return events, result
+
+
+# Backward-compat alias for existing happy-path tests
+async def run_happy_path(
+    provider: FakeProvider,
+    *,
+    release_gate_mode: ReleaseGateMode = ReleaseGateMode.AUTO,
+    max_rounds: int = 10,
+) -> tuple[list[ApplicationEvent], RunResult]:
+    """Run the orchestrator for happy-path tests (convenience wrapper)."""
+    return await run_consensus_helper(
+        provider,
+        release_gate_mode=release_gate_mode,
+        max_rounds=max_rounds,
+    )
