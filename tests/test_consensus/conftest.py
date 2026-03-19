@@ -18,6 +18,7 @@ from nelson.protocols.domain import (
     UsageSnapshot,
 )
 from nelson.protocols.enums import (
+    Adapter,
     FramingFeedbackStatus,
     ReleaseGateDecision,
     ReleaseGateMode,
@@ -177,6 +178,7 @@ async def run_happy_path(
         moderator="openai/gpt-4",
         max_rounds=max_rounds,
         release_gate_mode=release_gate_mode,
+        adapter=Adapter.CLI,
         provider=provider,
         emitter=emitter,
     )

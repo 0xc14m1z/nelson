@@ -97,6 +97,7 @@ async def run_consensus(
     moderator: str,
     max_rounds: int,
     release_gate_mode: ReleaseGateMode,
+    adapter: Adapter,
     provider: Provider,
     emitter: EventEmitter,
 ) -> RunResult:
@@ -119,7 +120,7 @@ async def run_consensus(
         role=Role.SYSTEM,
         payload=CommandReceivedPayload(
             command_type="run",
-            adapter=Adapter.CLI,  # Orchestrator currently only serves the CLI adapter
+            adapter=adapter,
         ),
     )
 
